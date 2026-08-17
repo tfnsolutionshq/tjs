@@ -14,6 +14,8 @@
     }
     $titleValue = old('title', $journal->title ?? '');
     $slugValue = old('slug', $journal->slug ?? '');
+    $initialsValue = old('initials', $journal->initials ?? '');
+    $suggestedInitials = \App\Models\Journal::initialsFromTitle($titleValue);
     $isActive = (string) old('is_active', $journal->exists ? ($journal->is_active ? '1' : '0') : '1') === '1';
     $isFeatured = (string) old('is_featured', $journal->exists ? ($journal->is_featured ? '1' : '0') : '0') === '1';
 @endphp
@@ -52,10 +54,12 @@
         .jf-span-2 { grid-column: 1 / -1; }
     }
 
-    .jf-field label {
+    .jf-field label,
+    .jf-field .tjs-label-row {
         display: block; margin-bottom: .4rem;
         font-size: .78rem; font-weight: 700; color: #334155; letter-spacing: .01em;
     }
+    .jf-req { color: #dc2626; font-weight: 800; margin-left: 0.05rem; }
     .jf-field .jf-hint {
         margin: .4rem 0 0; font-size: .72rem; color: var(--muted); line-height: 1.4;
     }
@@ -107,6 +111,23 @@
         width: 100%; border: 0; outline: 0; background: transparent;
         padding: .7rem .85rem .7rem .35rem; font: inherit; font-size: .9rem; color: var(--ink);
     }
+    .jf-slug.is-available { border-color: #86efac; background: #f0fdf4; }
+    .jf-slug.is-taken { border-color: #fca5a5; background: #fef2f2; }
+    .jf-slug.is-checking { border-color: #cbd5e1; }
+    .jf-slug--locked {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    .jf-slug--locked input {
+        color: #334155;
+        cursor: not-allowed;
+    }
+    .jf-slug-status {
+        margin: .4rem 0 0; font-size: .75rem; font-weight: 600; line-height: 1.4;
+    }
+    .jf-slug-status.is-available { color: #15803d; }
+    .jf-slug-status.is-taken { color: #b91c1c; }
+    .jf-slug-status.is-checking { color: var(--muted); font-weight: 500; }
 
     .jf-toggle {
         display: flex; align-items: flex-start; justify-content: space-between; gap: .85rem;
@@ -285,7 +306,8 @@
 
     .jf-lang { position: relative; z-index: 1; }
     .jf-lang:focus-within { z-index: 30; }
-    .jf-lang > label {
+    .jf-lang > label,
+    .jf-lang > .tjs-label-row {
         display: block; margin-bottom: .4rem;
         font-size: .78rem; font-weight: 700; color: #334155; letter-spacing: .01em;
     }
@@ -409,6 +431,110 @@
         };
     };
 
+    window.journalForm = function (config) {
+        return {
+            slug: config.slug || '',
+            initials: config.initials || '',
+            initialsTouched: config.initialsTouched || false,
+            initialSlug: config.initialSlug || '',
+            journalId: config.journalId || null,
+            slugLocked: config.slugLocked || false,
+            checkUrl: config.checkUrl,
+            slugStatus: 'idle',
+            slugMessage: '',
+            slugTimer: null,
+            init() {
+                if (this.slugLocked || this.slug.trim() === '') {
+                    return;
+                }
+                this.queueSlugCheck();
+            },
+            onTitleInput(event) {
+                if (this.initialsTouched) {
+                    return;
+                }
+                this.initials = this.suggestInitials(event.target.value || '');
+            },
+            onInitialsInput() {
+                this.initialsTouched = true;
+                this.initials = (this.initials || '')
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, '')
+                    .slice(0, 8);
+            },
+            suggestInitials(title) {
+                const words = (title || '').trim().split(/\s+/).filter(Boolean);
+                let value = words.slice(0, 3).map((word) => word.charAt(0).toUpperCase()).join('');
+                if (value.length < 2) {
+                    value = (title || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
+                }
+                if (! value) {
+                    value = 'JN';
+                }
+                return value.slice(0, 8);
+            },
+            onSlugInput() {
+                if (this.slugLocked) {
+                    return;
+                }
+                this.slug = this.slug
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]+/g, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/^-|-$/g, '');
+                this.queueSlugCheck();
+            },
+            queueSlugCheck() {
+                clearTimeout(this.slugTimer);
+                if (this.slug.trim() === '') {
+                    this.slugStatus = 'idle';
+                    this.slugMessage = '';
+                    return;
+                }
+                if (this.slug === this.initialSlug) {
+                    this.slugStatus = 'available';
+                    this.slugMessage = 'Current slug for this journal.';
+                    return;
+                }
+                this.slugStatus = 'checking';
+                this.slugMessage = 'Checking availability…';
+                this.slugTimer = setTimeout(() => this.checkSlug(), 350);
+            },
+            async checkSlug() {
+                const params = new URLSearchParams({ slug: this.slug });
+                if (this.journalId) {
+                    params.set('except', String(this.journalId));
+                }
+                try {
+                    const response = await fetch(`${this.checkUrl}?${params.toString()}`, {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                    });
+                    if (! response.ok) {
+                        this.slugStatus = 'idle';
+                        this.slugMessage = '';
+                        return;
+                    }
+                    const data = await response.json();
+                    if (data.slug && data.slug !== this.slug) {
+                        this.slug = data.slug;
+                    }
+                    this.slugStatus = data.available ? 'available' : 'taken';
+                    this.slugMessage = data.message || '';
+                } catch (error) {
+                    this.slugStatus = 'idle';
+                    this.slugMessage = '';
+                }
+            },
+            slugUnavailable() {
+                return this.slugStatus === 'taken';
+            },
+        };
+    };
+
     window.jfImagePreview = function () {
         return {
             preview: null,
@@ -445,7 +571,15 @@
     action="{{ $action }}"
     enctype="multipart/form-data"
     class="jf"
-    x-data="{ slug: @js($slugValue) }"
+    x-data="journalForm({
+        slug: @js($slugValue),
+        initials: @js($initialsValue),
+        initialsTouched: @js(filled(old('initials')) || ($isEdit && filled($journal->initials))),
+        initialSlug: @js($slugValue),
+        journalId: @js($isEdit ? $journal->id : null),
+        slugLocked: @js($isEdit),
+        checkUrl: @js(route('journals.check-slug')),
+    })"
     @if($platformEditsLocked) style="opacity:.72;pointer-events:none" aria-disabled="true" @endif
 >
     @csrf
@@ -473,28 +607,90 @@
             <div class="jf-card__body">
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field jf-span-2">
-                        <label for="title">Title</label>
-                        <input id="title" name="title" type="text" required value="{{ $titleValue }}" class="jf-input" placeholder="Journal title">
+                        <x-form-label for="title" field="journal.title" :required="true" reqClass="jf-req">Title</x-form-label>
+                        <input id="title" name="title" type="text" required value="{{ $titleValue }}" class="jf-input" placeholder="Journal title" @input="onTitleInput($event)">
                         @error('title')<p class="jf-error">{{ $message }}</p>@enderror
         </div>
 
                     <div class="jf-field">
-                        <label for="slug">Slug</label>
-                        <div class="jf-slug">
-                            <span class="jf-slug__prefix">/journals/</span>
-                            <input id="slug" name="slug" type="text" required x-model="slug" value="{{ $slugValue }}" placeholder="journal-slug" autocomplete="off">
-                        </div>
-                        @error('slug')<p class="jf-error">{{ $message }}</p>@enderror
-                        <p class="jf-hint">Used in public URLs. Letters, numbers, and dashes only.</p>
+                        <x-form-label for="initials" field="journal.initials">Initials</x-form-label>
+                        <input
+                            id="initials"
+                            name="initials"
+                            type="text"
+                            maxlength="8"
+                            x-model="initials"
+                            @input="onInitialsInput()"
+                            value="{{ $initialsValue }}"
+                            class="jf-input jf-input--mono"
+                            placeholder="{{ $suggestedInitials }}"
+                            autocomplete="off"
+                        >
+                        @error('initials')<p class="jf-error">{{ $message }}</p>@enderror
         </div>
 
                     <div class="jf-field">
-                        <label for="subtitle">Subtitle</label>
+                        @if($isEdit)
+                            <x-form-label for="slug" field="journal.slug">Slug</x-form-label>
+                        @else
+                            <x-form-label for="slug" field="journal.slug" :required="true" reqClass="jf-req">Slug</x-form-label>
+                        @endif
+                        @if($isEdit)
+                            <div class="jf-slug jf-slug--locked">
+                                <span class="jf-slug__prefix">/j/</span>
+                                <input
+                                    id="slug"
+                                    type="text"
+                                    value="{{ $slugValue }}"
+                                    readonly
+                                    disabled
+                                    aria-readonly="true"
+                                >
+                            </div>
+                        @else
+                            <div
+                                class="jf-slug"
+                                :class="{
+                                    'is-checking': slugStatus === 'checking',
+                                    'is-available': slugStatus === 'available',
+                                    'is-taken': slugStatus === 'taken',
+                                }"
+                            >
+                                <span class="jf-slug__prefix">/j/</span>
+                                <input
+                                    id="slug"
+                                    name="slug"
+                                    type="text"
+                                    required
+                                    x-model="slug"
+                                    @input="onSlugInput()"
+                                    value="{{ $slugValue }}"
+                                    placeholder="journal-slug"
+                                    autocomplete="off"
+                                >
+                            </div>
+                            @error('slug')<p class="jf-error">{{ $message }}</p>@enderror
+                            <p
+                                class="jf-slug-status"
+                                x-show="slugMessage"
+                                x-cloak
+                                x-text="slugMessage"
+                                :class="{
+                                    'is-checking': slugStatus === 'checking',
+                                    'is-available': slugStatus === 'available',
+                                    'is-taken': slugStatus === 'taken',
+                                }"
+                            ></p>
+                        @endif
+        </div>
+
+                    <div class="jf-field">
+                        <x-form-label for="subtitle" field="journal.subtitle">Subtitle</x-form-label>
                         <input id="subtitle" name="subtitle" type="text" value="{{ old('subtitle', $journal->subtitle ?? '') }}" class="jf-input" placeholder="Optional short line">
         </div>
 
                     <div class="jf-field jf-span-2">
-                        <label for="description">Description</label>
+                        <x-form-label for="description" field="journal.description">Description</x-form-label>
                         <textarea id="description" name="description" rows="4" class="jf-textarea" placeholder="What this journal publishes…">{{ old('description', $journal->description ?? '') }}</textarea>
                     </div>
                 </div>
@@ -509,19 +705,19 @@
             <div class="jf-card__body">
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field">
-                        <label for="issn">ISSN</label>
+                        <x-form-label for="issn" field="journal.issn">ISSN</x-form-label>
                         <input id="issn" name="issn" type="text" value="{{ old('issn', $journal->issn ?? '') }}" class="jf-input jf-input--mono" placeholder="0000-0000">
                     </div>
                     <div class="jf-field">
-                        <label for="eissn">eISSN</label>
+                        <x-form-label for="eissn" field="journal.eissn">eISSN</x-form-label>
                         <input id="eissn" name="eissn" type="text" value="{{ old('eissn', $journal->eissn ?? '') }}" class="jf-input jf-input--mono" placeholder="0000-0000">
                     </div>
                     <div class="jf-field">
-                        <label for="publisher">Publisher</label>
+                        <x-form-label for="publisher" field="journal.publisher">Publisher</x-form-label>
                         <input id="publisher" name="publisher" type="text" value="{{ old('publisher', $journal->publisher ?? '') }}" class="jf-input">
                     </div>
                     <div class="jf-field">
-                        <label for="default_license">Default license</label>
+                        <x-form-label for="default_license" field="journal.default_license">Default license</x-form-label>
                         <x-license-picker
                             name="default_license"
                             id="default_license"
@@ -536,6 +732,19 @@
                             :value="old('language', $journal->language ?? config('tjs.default_language', 'en'))"
                         />
                     </div>
+                    <div class="jf-field">
+                        <x-form-label for="review_type" field="journal.review_type" :required="true">Review type</x-form-label>
+                        @php $reviewType = old('review_type', $journal->review_type ?? \App\Support\ReviewType::CLOSED); @endphp
+                        <select id="review_type" name="review_type" required class="jf-input">
+                            @foreach(\App\Support\ReviewType::all() as $type)
+                                <option value="{{ $type }}" @selected($reviewType === $type)>
+                                    {{ \App\Support\ReviewType::label($type) }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="jf-hint">{{ \App\Support\ReviewType::description($reviewType) }}</p>
+                        @error('review_type')<p class="jf-error">{{ $message }}</p>@enderror
+                    </div>
                 </div>
             </div>
         </section>
@@ -548,7 +757,7 @@
             <div class="jf-card__body">
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field">
-                        <label for="logo">Logo</label>
+                        <x-form-label for="logo" field="journal.logo">Logo</x-form-label>
                         <div
                             class="jf-upload"
                             :class="{ 'has-preview': preview }"
@@ -583,12 +792,11 @@
                                 x-ref="input"
                                 @change="onFile($event)"
                             >
-                            <p class="jf-hint">PNG, JPG, or WebP up to 10MB.</p>
                             @error('logo')<p class="jf-error">{{ $message }}</p>@enderror
                         </div>
                     </div>
                     <div class="jf-field">
-                        <label for="header_image">Header / banner</label>
+                        <x-form-label for="header_image" field="journal.header_image">Header / banner</x-form-label>
                         <div
                             class="jf-upload"
                             :class="{ 'has-preview': preview }"
@@ -620,7 +828,6 @@
                                 x-ref="input"
                                 @change="onFile($event)"
                             >
-                            <p class="jf-hint">Prefer photos without overlaid text; the title renders on top. Max 15MB.</p>
                             @error('header_image')<p class="jf-error">{{ $message }}</p>@enderror
                         </div>
                     </div>
@@ -681,7 +888,7 @@
                     <p class="jf-theme-group__label">Layout</p>
                     <div class="jf-grid jf-grid--2">
                         <div class="jf-field">
-                            <label for="theme_header_size">Header size</label>
+                            <x-form-label for="theme_header_size" help="Controls banner title size on the public journal home page.">Header size</x-form-label>
                             <select id="theme_header_size" name="theme[header_size]" class="jf-select">
                                 @foreach(['small','medium','large'] as $size)
                                     <option value="{{ $size }}" @selected(($theme['header_size'] ?? 'large') === $size)>{{ ucfirst($size) }}</option>
@@ -689,30 +896,29 @@
                             </select>
                         </div>
                         <div class="jf-field">
-                            <label for="theme_header_align">Header alignment</label>
+                            <x-form-label for="theme_header_align" help="Horizontal alignment of the journal title on the banner.">Header alignment</x-form-label>
                             <select id="theme_header_align" name="theme[header_align]" class="jf-select">
                                 <option value="left" @selected(($theme['header_align'] ?? 'left') === 'left')>Left</option>
                                 <option value="center" @selected(($theme['header_align'] ?? 'left') === 'center')>Center</option>
                             </select>
                         </div>
                         <div class="jf-field">
-                            <label for="theme_font_style">Title font</label>
+                            <x-form-label for="theme_font_style" help="Serif or sans-serif typeface for the journal title on the public site.">Title font</x-form-label>
                             <select id="theme_font_style" name="theme[font_style]" class="jf-select">
                                 <option value="serif" @selected(($theme['font_style'] ?? 'serif') === 'serif')>Serif</option>
                                 <option value="sans" @selected(($theme['font_style'] ?? 'serif') === 'sans')>Sans</option>
                             </select>
                         </div>
                         <div class="jf-field">
-                            <label for="theme_hero_overlay">Image overlay</label>
+                            <x-form-label for="theme_hero_overlay" field="journal.header_overlay">Image overlay</x-form-label>
                             <input id="theme_hero_overlay" name="theme[hero_overlay]" type="number" min="0" max="0.9" step="0.05"
                                 value="{{ $theme['hero_overlay'] ?? 0.45 }}" class="jf-input" placeholder="0.45">
-                            <p class="jf-hint">0 = none, 0.9 = strongest darken.</p>
         </div>
     </div>
 
                     <label class="jf-toggle" style="margin-top:.9rem">
                         <span class="jf-toggle__copy">
-                            <span class="jf-toggle__label">Show subtitle in header</span>
+                            <span class="jf-toggle__label">Show subtitle in header <x-field-helper :text="\App\Support\FormHelp::get('journal.show_subtitle_in_header')" /></span>
                             <span class="jf-toggle__hint">Display the subtitle under the journal title on the public site.</span>
                         </span>
                         <span class="jf-switch">
@@ -742,7 +948,7 @@
                     <input type="hidden" name="assign_admin" :value="assign ? '1' : '0'">
                     <label class="jf-toggle" style="margin-bottom:1rem">
                         <span class="jf-toggle__copy">
-                            <span class="jf-toggle__label">Assign a journal admin now</span>
+                            <span class="jf-toggle__label">Assign a journal admin now <x-field-helper :text="\App\Support\FormHelp::get('journal.assign_admin_now')" /></span>
                             <span class="jf-toggle__hint">You can also do this later from the journal edit page.</span>
                         </span>
                         <span class="jf-switch">
@@ -753,7 +959,7 @@
 
                     <div x-show="assign" x-cloak style="display:grid;gap:.9rem">
                         <div class="jf-field">
-                            <label>How to assign</label>
+                            <x-form-label field="journal.team_mode">How to assign</x-form-label>
                             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                                 <button type="button" class="admin-btn admin-btn-secondary" :style="mode === 'create' && 'border-color:#94a3b8'" @click="mode = 'create'">Create new account</button>
                                 <button type="button" class="admin-btn admin-btn-secondary" :style="mode === 'existing' && 'border-color:#94a3b8'" @click="mode = 'existing'">Existing user</button>
@@ -762,13 +968,13 @@
                         </div>
 
                         <div class="jf-field" x-show="mode === 'create'">
-                            <label for="admin_name">Full name</label>
+                            <x-form-label for="admin_name" field="journal.team_name">Full name</x-form-label>
                             <input id="admin_name" name="admin_name" type="text" class="jf-input" value="{{ old('admin_name') }}" :disabled="mode !== 'create'">
                             @error('admin_name')<p class="jf-error">{{ $message }}</p>@enderror
                         </div>
 
                         <div class="jf-field">
-                            <label for="admin_email">Email</label>
+                            <x-form-label for="admin_email" field="journal.team_email">Email</x-form-label>
                             <input id="admin_email" name="admin_email" type="email" class="jf-input" value="{{ old('admin_email') }}" placeholder="admin@example.com">
                             <p class="jf-hint" x-show="mode === 'existing'">Must already have a TJS account.</p>
                             @error('admin_email')<p class="jf-error">{{ $message }}</p>@enderror
@@ -776,13 +982,13 @@
 
                         <div class="jf-grid jf-grid--2" x-show="mode === 'create'">
                             <div class="jf-field">
-                                <label for="admin_password">Temporary password</label>
-                                <input id="admin_password" name="admin_password" type="password" class="jf-input" autocomplete="new-password" :disabled="mode !== 'create'">
+                                <x-form-label for="admin_password" field="user.password">Temporary password</x-form-label>
+                                <x-password-input id="admin_password" name="admin_password" class="jf-input" autocomplete="new-password" x-bind:disabled="mode !== 'create'" />
                                 @error('admin_password')<p class="jf-error">{{ $message }}</p>@enderror
                             </div>
                             <div class="jf-field">
-                                <label for="admin_password_confirmation">Confirm password</label>
-                                <input id="admin_password_confirmation" name="admin_password_confirmation" type="password" class="jf-input" autocomplete="new-password" :disabled="mode !== 'create'">
+                                <x-form-label for="admin_password_confirmation" field="user.password_confirmation">Confirm password</x-form-label>
+                                <x-password-input id="admin_password_confirmation" name="admin_password_confirmation" class="jf-input" autocomplete="new-password" x-bind:disabled="mode !== 'create'" />
                             </div>
                         </div>
                     </div>
@@ -802,8 +1008,7 @@
                 <input type="hidden" name="is_featured" value="0">
                 <label class="jf-toggle">
                     <span class="jf-toggle__copy">
-                        <span class="jf-toggle__label">Active</span>
-                        <span class="jf-toggle__hint">Visible in public browse.</span>
+                        <span class="jf-toggle__label">Active <x-field-helper :text="\App\Support\FormHelp::get('journal.status')" /></span>
                     </span>
                     <span class="jf-switch">
                         <input type="checkbox" name="is_active" value="1" @checked($isActive)>
@@ -812,7 +1017,7 @@
                 </label>
                 <label class="jf-toggle">
                     <span class="jf-toggle__copy">
-                        <span class="jf-toggle__label">Featured</span>
+                        <span class="jf-toggle__label">Featured <x-field-helper :text="\App\Support\FormHelp::get('journal.featured')" /></span>
                         <span class="jf-toggle__hint">Highlight on the homepage.</span>
                     </span>
                     <span class="jf-switch">
@@ -826,7 +1031,7 @@
                     <input type="hidden" name="allow_platform_admin_edits" value="0">
                     <label class="jf-toggle">
                         <span class="jf-toggle__copy">
-                            <span class="jf-toggle__label">Allow platform admin edits</span>
+                            <span class="jf-toggle__label">Allow platform admin edits <x-field-helper :text="\App\Support\FormHelp::get('journal.platform_admin_edits')" /></span>
                             <span class="jf-toggle__hint">When on, platform administrators can change this journal from the platform admin portal.</span>
                         </span>
                         <span class="jf-switch">
@@ -842,7 +1047,7 @@
                 </div>
             @endisset
             <div class="jf-actions">
-                <button type="submit" class="admin-btn admin-btn-primary" style="flex:1" @disabled($platformEditsLocked)>
+                <button type="submit" class="admin-btn admin-btn-primary" style="flex:1" @disabled($platformEditsLocked) :disabled="! slugLocked && slugUnavailable()">
                     {{ $manageJournal ? 'Save settings' : ($isEdit ? 'Save changes' : 'Create journal') }}
                 </button>
                 <a href="{{ $manageJournal ? route('journal.manage.dashboard', $manageJournal) : route('admin.journals.index') }}" class="admin-btn admin-btn-secondary">Cancel</a>
@@ -858,7 +1063,7 @@
                     <div class="jf-meta">
                         <div class="jf-meta__row">
                             <span>Public URL</span>
-                            <strong>/journals/<span x-text="slug || '…'"></span></strong>
+                            <strong>/j/<span x-text="slug || '…'"></span></strong>
                         </div>
                     </div>
                     <a href="{{ route('journals.show', $journal) }}" target="_blank" rel="noopener" class="admin-btn admin-btn-secondary" style="width:100%">

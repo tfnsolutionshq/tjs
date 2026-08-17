@@ -26,7 +26,7 @@
             @method('delete')
 
             <div class="pf-field">
-                <label for="password">Password</label>
+                <x-form-label for="password" field="user.current_password">Password</x-form-label>
                 <input id="password" name="password" type="password" class="pf-input" placeholder="Current password" required :readonly="submitting">
                 @error('password', 'userDeletion')
                     <p class="pf-error">{{ $message }}</p>

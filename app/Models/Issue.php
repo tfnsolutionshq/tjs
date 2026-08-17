@@ -32,6 +32,16 @@ class Issue extends Model
         return $this->hasMany(Article::class);
     }
 
+    public function submissions(): HasMany
+    {
+        return $this->hasMany(Submission::class);
+    }
+
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(JournalAnnouncement::class);
+    }
+
     public function isPublished(): bool
     {
         return $this->status === 'published';

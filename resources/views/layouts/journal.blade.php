@@ -247,6 +247,7 @@
             ['label' => 'Current', 'route' => 'journals.show', 'params' => [$journal]],
             ['label' => 'Archives', 'route' => 'journals.archive', 'params' => [$journal]],
             ['label' => 'About', 'route' => 'journals.about', 'params' => [$journal]],
+            ['label' => 'Announcements', 'route' => 'journals.announcements', 'params' => [$journal]],
             ['label' => 'Editorial Board', 'route' => 'journals.editorial-board', 'params' => [$journal]],
             ['label' => 'Reviewers', 'route' => 'journals.reviewers', 'params' => [$journal]],
             ['label' => 'Browse', 'route' => 'journals.browse', 'params' => [$journal]],

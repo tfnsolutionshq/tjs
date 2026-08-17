@@ -428,7 +428,7 @@
                 <input type="hidden" name="_plan_id" :value="editingId || ''">
 
                 <div class="amp-field">
-                    <label for="amp_name">Name <span class="amp-req">*</span></label>
+                    <x-form-label for="amp_name" field="plan.name" :required="true" reqClass="amp-req">Name</x-form-label>
                     <input id="amp_name" name="name" type="text" required class="amp-input" x-model="form.name" placeholder="e.g. Platform Annual Membership">
                     @error('name')<p class="amp-error">{{ $message }}</p>@enderror
                 </div>
@@ -438,33 +438,37 @@
                         <input type="hidden" name="scope" value="journal">
                         <input type="hidden" name="journal_id" value="{{ $manageJournal->id }}">
                         <div class="amp-field" style="grid-column:1/-1">
-                            <label>Journal</label>
+                            <x-form-label field="plan.journal">Journal</x-form-label>
                             <div class="amp-input" style="background:#f8fafc;font-weight:700">{{ $manageJournal->title }}</div>
                             <p class="amp-hint">Plans created here are scoped to this journal only.</p>
                         </div>
                     @else
                     <div class="amp-field">
-                        <label for="amp_scope">Scope <span class="amp-req">*</span></label>
+                        <x-form-label for="amp_scope" field="plan.scope" :required="true" reqClass="amp-req">Scope</x-form-label>
                         <select id="amp_scope" name="scope" required class="amp-select-field" x-model="form.scope">
                             <option value="platform">Platform</option>
                             <option value="journal">Journal</option>
                         </select>
                     </div>
                     <div class="amp-field" x-show="form.scope === 'journal'" x-cloak>
-                        <label for="amp_journal_id">Journal <span class="amp-req">*</span></label>
-                        <select id="amp_journal_id" name="journal_id" class="amp-select-field" x-model="form.journal_id" :required="form.scope === 'journal'">
-                            <option value="">Select journal…</option>
-                            @foreach($journals as $journalOption)
-                                <option value="{{ $journalOption->id }}">{{ $journalOption->title }}</option>
-                            @endforeach
-                        </select>
+                        <x-form-label for="amp_journal_id" field="plan.journal" :required="true" reqClass="amp-req">Journal</x-form-label>
+                        <div x-ref="planJournalPicker">
+                        <x-journal-picker
+                            :journals="$journals"
+                            name="journal_id"
+                            input-id="amp_journal_id"
+                            :value="old('journal_id', '')"
+                            required
+                            @picker-change="form.journal_id = $event.detail"
+                        />
+                        </div>
                         @error('journal_id')<p class="amp-error">{{ $message }}</p>@enderror
                     </div>
                     @endif
                 </div>
 
                 <div class="amp-field">
-                    <label for="amp_price_amount">Price <span class="amp-req">*</span></label>
+                    <x-form-label for="amp_price_amount" field="plan.price" :required="true" reqClass="amp-req">Price</x-form-label>
                     <div class="amp-price-wrap">
                         <select name="currency" class="amp-select-field" x-model="form.currency">
                             @foreach(['NGN', 'USD', 'EUR', 'GBP'] as $code)
@@ -473,12 +477,11 @@
                         </select>
                         <input id="amp_price_amount" name="price_amount" type="number" min="0" required class="amp-input" x-model="form.price_amount" placeholder="15000">
                     </div>
-                    <p class="amp-hint">Whole currency units (e.g. 15000 for ₦15,000).</p>
                     @error('price_amount')<p class="amp-error">{{ $message }}</p>@enderror
                 </div>
 
                 <div class="amp-field">
-                    <label for="amp_duration_days">Duration (days) <span class="amp-req">*</span></label>
+                    <x-form-label for="amp_duration_days" field="plan.duration_days" :required="true" reqClass="amp-req">Duration (days)</x-form-label>
                     <input id="amp_duration_days" name="duration_days" type="number" min="1" max="3650" required class="amp-input" x-model="form.duration_days">
                     <div class="amp-duration-chips">
                         <template x-for="preset in durationPresets" :key="preset.days">
@@ -496,7 +499,7 @@
 
                 <div class="amp-toggle">
             <div>
-                        <div class="amp-toggle__label">Active</div>
+                        <x-form-label field="plan.active" class="amp-toggle__label">Active</x-form-label>
                         <p class="amp-toggle__hint">Inactive plans stay hidden from purchase options.</p>
             </div>
                     <button type="button" class="amp-switch" :class="form.is_active && 'is-on'" @click="form.is_active = !form.is_active" :aria-pressed="form.is_active"></button>
@@ -574,6 +577,7 @@ function ampPlans(cfg) {
                 this.form.journal_id = String(cfg.manageJournalId || '');
             }
             this.drawerOpen = true;
+            this.$nextTick(() => this.syncJournalPicker());
         },
         openEdit(id) {
             const plan = this.plans.find((p) => Number(p.id) === Number(id));
@@ -589,6 +593,12 @@ function ampPlans(cfg) {
                 is_active: !!plan.is_active,
             };
             this.drawerOpen = true;
+            this.$nextTick(() => this.syncJournalPicker());
+        },
+        syncJournalPicker() {
+            const picker = this.$refs.planJournalPicker?.querySelector('.tjs-journal-picker');
+            if (!picker) return;
+            picker.dispatchEvent(new CustomEvent('journal-picker-set', { detail: this.form.journal_id || '' }));
         },
         closeDrawer() {
             this.drawerOpen = false;

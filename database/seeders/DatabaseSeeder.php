@@ -101,6 +101,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        app(\App\Services\Journal\CategoryService::class)->seedDefaults($journal);
+
         $journal->users()->detach([$editor->id, $reviewer->id]);
         $journal->assignTeamMember($editor, 'admin');
         $journal->assignTeamMember($reviewer, 'reviewer');

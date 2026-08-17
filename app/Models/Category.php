@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
 class Category extends Model
 {
     protected $fillable = [
+        'journal_id',
         'name',
         'slug',
         'is_active',
@@ -32,13 +35,25 @@ class Category extends Model
         });
     }
 
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(Journal::class);
+    }
+
     public function articles(): BelongsToMany
     {
         return $this->belongsToMany(Article::class)->withTimestamps();
     }
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeForJournal(Builder $query, int|Journal $journal): Builder
+    {
+        $journalId = $journal instanceof Journal ? $journal->id : $journal;
+
+        return $query->where('journal_id', $journalId);
     }
 }

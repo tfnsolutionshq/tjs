@@ -99,6 +99,8 @@ class SubmissionController extends Controller
 
         $submission->load([
             'journal',
+            'issue.volume',
+            'announcement',
             'author',
             'reviewer',
             'assignments.reviewer',
@@ -140,6 +142,14 @@ class SubmissionController extends Controller
         $request->attributes->set('manage_journal', $journal);
 
         return $this->platform->assignReviewer($request, $submission);
+    }
+
+    public function updateReviewType(Request $request, Journal $journal, Submission $submission): RedirectResponse
+    {
+        abort_unless((int) $submission->journal_id === (int) $journal->id, 404);
+        $request->attributes->set('manage_journal', $journal);
+
+        return $this->platform->updateReviewType($request, $submission);
     }
 
     public function publishToIssue(Request $request, Journal $journal, Submission $submission): RedirectResponse

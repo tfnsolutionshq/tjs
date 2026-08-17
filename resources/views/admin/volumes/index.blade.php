@@ -247,19 +247,19 @@
             @csrf
             <div class="av-grid av-grid--2">
                 <div class="av-field">
-                    <label for="volume_number">Volume number</label>
+                    <x-form-label for="volume_number" field="volume.number" :required="true">Volume number</x-form-label>
                     <input id="volume_number" name="volume_number" type="number" min="1" required class="av-input"
                         value="{{ old('volume_number', $nextVolume) }}" placeholder="{{ $nextVolume }}">
                     @error('volume_number')<p class="av-error">{{ $message }}</p>@enderror
                 </div>
                 <div class="av-field">
-                    <label for="year">Year</label>
+                    <x-form-label for="year" field="volume.year" :required="true">Year</x-form-label>
                     <input id="year" name="year" type="number" min="1900" max="2100" required class="av-input"
                         value="{{ old('year', date('Y')) }}">
                     @error('year')<p class="av-error">{{ $message }}</p>@enderror
                 </div>
                 <div class="av-field">
-                    <label for="title">Title</label>
+                    <x-form-label for="title" field="volume.title">Title</x-form-label>
                     <input id="title" name="title" type="text" class="av-input" value="{{ old('title') }}" placeholder="Optional volume title">
                 </div>
                 <div class="av-field">
@@ -271,7 +271,7 @@
                     <textarea id="introduction" name="introduction" rows="3" class="av-textarea" placeholder="Optional intro for this volume">{{ old('introduction') }}</textarea>
                 </div>
                 <div class="av-field">
-                    <label for="status">Status</label>
+                    <x-form-label for="status" field="volume.status" :required="true">Status</x-form-label>
                     <select id="status" name="status" required class="av-select">
                         <option value="draft" @selected(old('status', 'draft') === 'draft')>Draft</option>
                         <option value="published" @selected(old('status') === 'published')>Published</option>
@@ -328,22 +328,22 @@
                         <input type="hidden" name="_volume_id" value="{{ $volume->id }}">
                         <div class="av-grid av-grid--3">
                             <div class="av-field">
-                                <label>Volume number</label>
+                                <x-form-label field="volume.number" :required="true">Volume number</x-form-label>
                                 <input name="volume_number" type="number" min="1" required class="av-input" value="{{ old('volume_number', $volume->volume_number) }}">
                             </div>
                             <div class="av-field">
-                                <label>Year</label>
+                                <x-form-label field="volume.year" :required="true">Year</x-form-label>
                                 <input name="year" type="number" min="1900" max="2100" required class="av-input" value="{{ old('year', $volume->year) }}">
                             </div>
                             <div class="av-field">
-                                <label>Status</label>
+                                <x-form-label field="volume.status" :required="true">Status</x-form-label>
                                 <select name="status" required class="av-select">
                                     <option value="draft" @selected(old('status', $volume->status) === 'draft')>Draft</option>
                                     <option value="published" @selected(old('status', $volume->status) === 'published')>Published</option>
                                 </select>
                             </div>
                             <div class="av-field">
-                                <label>Title</label>
+                                <x-form-label field="volume.title">Title</x-form-label>
                                 <input name="title" type="text" class="av-input" value="{{ old('title', $volume->title) }}">
                             </div>
                             <div class="av-field">
@@ -406,15 +406,15 @@
                                 @csrf
                                 @method('PUT')
                                 <div class="av-field">
-                                    <label>Issue number</label>
+                                    <x-form-label field="article.issue_number" :required="true">Issue number</x-form-label>
                                     <input name="issue_number" type="number" min="1" required class="av-input" value="{{ $issue->issue_number }}">
                                 </div>
                                 <div class="av-field">
-                                    <label>Title</label>
+                                    <x-form-label field="article.issue_title">Title</x-form-label>
                                     <input name="title" type="text" class="av-input" value="{{ $issue->title }}">
                                 </div>
                                 <div class="av-field">
-                                    <label>Status</label>
+                                    <x-form-label field="article.issue_status" :required="true">Status</x-form-label>
                                     <select name="status" required class="av-select">
                                         <option value="draft" @selected($issue->status === 'draft')>Draft</option>
                                         <option value="published" @selected($issue->status === 'published')>Published</option>
@@ -449,16 +449,16 @@
                         <input type="hidden" name="_issue_volume" value="{{ $volume->id }}">
                         <div class="av-grid av-grid--3">
                             <div class="av-field">
-                                <label>Issue number</label>
+                                <x-form-label field="article.issue_number" :required="true">Issue number</x-form-label>
                                 <input name="issue_number" type="number" min="1" required class="av-input"
                                     value="{{ ($volume->issues->max('issue_number') ?? 0) + 1 }}">
                             </div>
                             <div class="av-field">
-                                <label>Title</label>
+                                <x-form-label field="article.issue_title">Title</x-form-label>
                                 <input name="title" type="text" class="av-input" placeholder="Optional">
                             </div>
                             <div class="av-field">
-                                <label>Status</label>
+                                <x-form-label field="article.issue_status" :required="true">Status</x-form-label>
                                 <select name="status" required class="av-select">
                                     <option value="draft">Draft</option>
                                     <option value="published">Published</option>

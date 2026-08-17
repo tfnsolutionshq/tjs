@@ -28,6 +28,8 @@ class ProfileUpdateRequest extends FormRequest
             'position' => ['nullable', 'string', 'max:255'],
             'orcid' => ['nullable', 'string', 'max:64'],
             'bio' => ['nullable', 'string', 'max:2000'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
+            'remove_avatar' => ['nullable', 'boolean'],
             'is_public_reviewer' => ['sometimes', 'boolean'],
         ];
     }

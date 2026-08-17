@@ -3,21 +3,26 @@
 namespace App\Http\Controllers\Author;
 
 use App\Http\Controllers\Controller;
-use App\Models\Journal;
+use App\Models\Category;
+use App\Models\ReviewerAssignment;
 use App\Models\Submission;
 use App\Models\SubmissionRevision;
 use App\Models\SubmissionTimeline;
+use App\Services\Journal\CallForSubmissionService;
 use App\Services\Storage\ArticleStorage;
+use App\Support\ReviewType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SubmissionController extends Controller
 {
     public function __construct(
         private ArticleStorage $storage,
+        private CallForSubmissionService $calls,
     ) {
     }
 
@@ -28,12 +33,12 @@ class SubmissionController extends Controller
         $stats = [
             'total' => (clone $base)->count(),
             'in_review' => (clone $base)->whereIn('status', ['submitted', 'under_review', 'resubmitted', 'revision_requested'])->count(),
-            'accepted' => (clone $base)->where('status', 'accepted')->count(),
+            'accepted' => (clone $base)->where('status', 'approved')->count(),
             'rejected' => (clone $base)->where('status', 'rejected')->count(),
         ];
 
         $query = Submission::query()
-            ->with('journal:id,title,slug')
+            ->with(['journal:id,title,slug', 'issue.volume', 'announcement:id,title'])
             ->where('author_id', $request->user()->id)
             ->orderByDesc('updated_at');
 
@@ -49,12 +54,12 @@ class SubmissionController extends Controller
         $status = $request->get('status');
         $statusGroups = [
             'in_review' => ['submitted', 'under_review', 'resubmitted', 'revision_requested'],
-            'accepted' => ['accepted'],
+            'accepted' => ['approved'],
             'rejected' => ['rejected'],
         ];
         if (isset($statusGroups[$status])) {
             $query->whereIn('status', $statusGroups[$status]);
-        } elseif (in_array($status, ['submitted', 'under_review', 'resubmitted', 'revision_requested', 'accepted', 'rejected'], true)) {
+        } elseif (in_array($status, ['submitted', 'under_review', 'resubmitted', 'revision_requested', 'approved', 'rejected'], true)) {
             $query->where('status', $status);
         }
 
@@ -63,39 +68,75 @@ class SubmissionController extends Controller
         return view('author.submissions.index', compact('submissions', 'stats', 'status'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        $journals = Journal::query()
-            ->where('is_active', true)
-            ->orderBy('title')
-            ->get(['id', 'title', 'slug', 'subtitle']);
+        $openCalls = $this->calls->openCalls();
+        $preselectedCall = (string) old('announcement_id', $request->integer('announcement') ?: '');
 
-        return view('author.submissions.create', compact('journals'));
+        $journalIds = $openCalls->pluck('journal_id')->unique()->filter()->values();
+        $categoriesByJournal = Category::query()
+            ->active()
+            ->whereIn('journal_id', $journalIds)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'journal_id', 'name'])
+            ->groupBy('journal_id')
+            ->map(fn ($group) => $group->map(fn (Category $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+            ])->values())
+            ->all();
+
+        $upcomingCalls = $openCalls->isEmpty() ? $this->calls->upcomingCalls() : collect();
+        $recentlyClosedCalls = $openCalls->isEmpty() ? $this->calls->recentlyClosedCalls() : collect();
+
+        return view('author.submissions.create', compact(
+            'openCalls',
+            'preselectedCall',
+            'categoriesByJournal',
+            'upcomingCalls',
+            'recentlyClosedCalls',
+        ));
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'journal_id' => ['required', 'exists:journals,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'abstract' => ['nullable', 'string'],
-            'category' => ['nullable', 'string', 'max:255'],
-            'keywords' => ['nullable', 'string', 'max:500'],
-            'document' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
+        $request->validate([
+            'announcement_id' => ['required', 'exists:journal_announcements,id'],
         ]);
 
-        $journal = Journal::query()->findOrFail($data['journal_id']);
-        abort_unless($journal->is_active, 422, 'Journal is not accepting submissions.');
+        $announcement = $this->calls->findOpenCall((int) $request->input('announcement_id'));
+        $journal = $announcement->journal;
+        abort_unless($journal && $journal->is_active, 422, 'Journal is not accepting submissions.');
 
-        $submission = DB::transaction(function () use ($request, $data, $journal) {
+        $data = $request->validate([
+            'announcement_id' => ['required', 'exists:journal_announcements,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'abstract' => ['nullable', 'string'],
+            'category' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::exists('categories', 'name')->where(
+                    fn ($query) => $query->where('journal_id', $journal->id)->where('is_active', true)
+                ),
+            ],
+            'keywords' => ['nullable', 'string', 'max:500'],
+            'document' => ['required', 'file', 'mimes:doc,docx', 'max:51200'],
+        ]);
+
+        $submission = DB::transaction(function () use ($request, $data, $announcement, $journal) {
             $submission = new Submission([
                 'journal_id' => $journal->id,
+                'issue_id' => $announcement->issue_id,
+                'announcement_id' => $announcement->id,
                 'author_id' => $request->user()->id,
                 'title' => $data['title'],
                 'abstract' => $data['abstract'] ?? null,
                 'category' => $data['category'] ?? null,
                 'keywords' => $data['keywords'] ?? null,
                 'status' => 'submitted',
+                'review_type' => ReviewType::forJournal($journal),
             ]);
             $submission->id = (string) Str::uuid();
 
@@ -111,7 +152,10 @@ class SubmissionController extends Controller
                 'submission_id' => $submission->id,
                 'user_id' => $request->user()->id,
                 'event' => 'submitted',
-                'metadata' => null,
+                'metadata' => [
+                    'announcement_id' => $announcement->id,
+                    'issue_id' => $announcement->issue_id,
+                ],
             ]);
 
             return $submission;
@@ -126,7 +170,7 @@ class SubmissionController extends Controller
     {
         abort_unless((int) $submission->author_id === (int) $request->user()->id, 403);
 
-        $submission->load(['journal', 'timelines.user', 'revisions', 'assignments.reviewer']);
+        $submission->load(['journal', 'issue.volume', 'announcement', 'timelines.user', 'revisions', 'assignments.reviewer']);
 
         return view('author.submissions.show', compact('submission'));
     }
@@ -141,20 +185,41 @@ class SubmissionController extends Controller
         );
 
         $data = $request->validate([
-            'document' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
+            'document' => ['required', 'file', 'mimes:doc,docx', 'max:51200'],
             'notes' => ['nullable', 'string'],
         ]);
 
         $submission->loadMissing('journal');
 
         DB::transaction(function () use ($request, $submission, $data) {
+            $previousPath = $submission->document_path;
+
             $path = $this->storage->storeSubmissionDocument(
                 $submission->journal,
                 $submission->id,
                 $request->file('document')
             );
 
-            $revisionNumber = (int) $submission->revisions()->max('revision_number') + 1;
+            $revisionNumber = (int) $submission->revisions()->max('revision_number');
+
+            // Preserve the pre-resubmission manuscript as revision history when missing.
+            if (
+                $previousPath
+                && ! $submission->revisions()->where('document_path', $previousPath)->exists()
+            ) {
+                if ($revisionNumber < 1) {
+                    SubmissionRevision::query()->create([
+                        'submission_id' => $submission->id,
+                        'uploaded_by' => $submission->author_id,
+                        'revision_number' => 0,
+                        'document_path' => $previousPath,
+                        'notes' => 'Original submission',
+                    ]);
+                    $revisionNumber = 0;
+                }
+            }
+
+            $revisionNumber++;
 
             SubmissionRevision::query()->create([
                 'submission_id' => $submission->id,
@@ -164,10 +229,23 @@ class SubmissionController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            $reviewerId = $submission->reviewer_id;
+            if (! $reviewerId) {
+                $reviewerId = ReviewerAssignment::query()
+                    ->where('submission_id', $submission->id)
+                    ->orderByDesc('id')
+                    ->value('reviewer_id');
+            }
+
             $submission->update([
                 'document_path' => $path,
                 'status' => 'resubmitted',
+                'reviewer_id' => $reviewerId,
             ]);
+
+            if ($reviewerId) {
+                $this->reopenReviewerAssignment($submission, (int) $reviewerId);
+            }
 
             SubmissionTimeline::query()->create([
                 'submission_id' => $submission->id,
@@ -175,12 +253,35 @@ class SubmissionController extends Controller
                 'event' => 'resubmitted',
                 'metadata' => [
                     'revision_number' => $revisionNumber,
+                    'reviewer_id' => $reviewerId ? (int) $reviewerId : null,
                 ],
             ]);
         });
 
         return redirect()
             ->route('author.submissions.show', $submission)
-            ->with('status', 'Revision uploaded.');
+            ->with('status', 'Revision uploaded. It has been returned to the assigned reviewer.');
+    }
+
+    private function reopenReviewerAssignment(Submission $submission, int $reviewerId): void
+    {
+        $assignment = ReviewerAssignment::query()
+            ->where('submission_id', $submission->id)
+            ->where('reviewer_id', $reviewerId)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($assignment) {
+            $assignment->update(['status' => 'assigned']);
+
+            return;
+        }
+
+        ReviewerAssignment::query()->create([
+            'submission_id' => $submission->id,
+            'reviewer_id' => $reviewerId,
+            'status' => 'assigned',
+            'priority' => 3,
+        ]);
     }
 }

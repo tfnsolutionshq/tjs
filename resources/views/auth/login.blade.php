@@ -14,25 +14,26 @@
         @csrf
 
         <div>
-            <label class="auth-label" for="email">Email</label>
+            <x-form-label class="auth-label" for="email" field="auth.email">Email</x-form-label>
             <input id="email" class="auth-input" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" :readonly="submitting">
             <x-input-error :messages="$errors->get('email')" class="auth-error" />
         </div>
 
         <div>
             <div class="mb-1 flex items-center justify-between">
-                <label class="auth-label !mb-0" for="password">Password</label>
+                <x-form-label class="auth-label !mb-0" for="password" field="auth.password">Password</x-form-label>
                 @if (Route::has('password.request'))
                     <a class="auth-link text-xs" href="{{ route('password.request') }}">Forgot password?</a>
                 @endif
             </div>
-            <input id="password" class="auth-input" type="password" name="password" required autocomplete="current-password" :readonly="submitting">
+            <x-password-input id="password" name="password" class="auth-input" required autocomplete="current-password" x-bind:readonly="submitting" />
             <x-input-error :messages="$errors->get('password')" class="auth-error" />
         </div>
 
         <label for="remember_me" class="inline-flex items-center gap-2 text-sm" style="color:var(--muted)">
             <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-[var(--blue)] focus:ring-[var(--blue)]" name="remember" @click="if (submitting) $event.preventDefault()">
             Remember me
+            <x-field-helper :text="\App\Support\FormHelp::get('auth.remember')" />
         </label>
 
         <button

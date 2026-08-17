@@ -2,25 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Membership;
 use App\Models\MembershipPlan;
+use App\Services\Journal\ReviewerRequestService;
+use App\Services\Membership\MembershipCoverageService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MembershipController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, MembershipCoverageService $coverage): View
     {
         $user = $request->user();
-
-        $activeMemberships = Membership::query()
-            ->with(['plan', 'journal:id,title,slug'])
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->where('starts_at', '<=', now())
-            ->where('ends_at', '>=', now())
-            ->orderByDesc('ends_at')
-            ->get();
+        $activeMemberships = $coverage->activeMemberships($user);
 
         $plans = MembershipPlan::query()
             ->where('is_active', true)
@@ -29,6 +22,24 @@ class MembershipController extends Controller
             ->orderBy('price_amount')
             ->get();
 
-        return view('memberships.index', compact('activeMemberships', 'plans'));
+        $availablePlans = $plans->filter(
+            fn (MembershipPlan $plan) => ! $coverage->planIsCovered($user, $plan, $activeMemberships)
+        )->values();
+
+        $coveredPlans = $plans->filter(
+            fn (MembershipPlan $plan) => $coverage->planIsCovered($user, $plan, $activeMemberships)
+        )->map(fn (MembershipPlan $plan) => [
+            'plan' => $plan,
+            'membership' => $coverage->coveringMembership($user, $plan, $activeMemberships),
+        ])->values();
+
+        $reviewerRequestJournals = app(ReviewerRequestService::class)->memberJournalContexts($user);
+
+        return view('memberships.index', compact(
+            'activeMemberships',
+            'availablePlans',
+            'coveredPlans',
+            'reviewerRequestJournals',
+        ));
     }
 }

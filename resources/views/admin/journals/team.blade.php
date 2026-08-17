@@ -67,32 +67,31 @@
                 <input type="hidden" name="mode" value="create">
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field">
-                        <label for="team_name">Full name</label>
+                        <x-form-label for="team_name" field="journal.team_name" :required="true" reqClass="jf-req">Full name</x-form-label>
                         <input id="team_name" name="name" type="text" class="jf-input" value="{{ old('mode') === 'create' ? old('name') : '' }}" required>
                         @error('name')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
-                        <label for="team_email_create">Email</label>
+                        <x-form-label for="team_email_create" field="journal.team_email" :required="true" reqClass="jf-req">Email</x-form-label>
                         <input id="team_email_create" name="email" type="email" class="jf-input" value="{{ old('mode') === 'create' ? old('email') : '' }}" required>
                         @error('email')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
-                        <label for="team_password">Temporary password</label>
-                        <input id="team_password" name="password" type="password" class="jf-input" autocomplete="new-password" required>
+                        <x-form-label for="team_password" field="user.password" :required="true" reqClass="jf-req">Temporary password</x-form-label>
+                        <x-password-input id="team_password" name="password" class="jf-input" autocomplete="new-password" required />
                         @error('password')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
-                        <label for="team_password_confirmation">Confirm password</label>
-                        <input id="team_password_confirmation" name="password_confirmation" type="password" class="jf-input" autocomplete="new-password" required>
+                        <x-form-label for="team_password_confirmation" field="user.password_confirmation" :required="true" reqClass="jf-req">Confirm password</x-form-label>
+                        <x-password-input id="team_password_confirmation" name="password_confirmation" class="jf-input" autocomplete="new-password" required />
                     </div>
                     <div class="jf-field">
-                        <label for="team_role_create">Role</label>
+                        <x-form-label for="team_role_create" field="journal.team_role">Role</x-form-label>
                         <select id="team_role_create" name="role" class="jf-select">
                             @foreach(JournalTeamRoles::all() as $role)
                                 <option value="{{ $role }}" @selected(old('role', JournalTeamRoles::ADMIN) === $role)>{{ JournalTeamRoles::label($role) }}</option>
                             @endforeach
                         </select>
-                        <p class="jf-hint">{{ JournalTeamRoles::description(JournalTeamRoles::ADMIN) }}</p>
                     </div>
                 </div>
                 <div>
@@ -105,12 +104,12 @@
                 <input type="hidden" name="mode" value="existing">
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field">
-                        <label for="team_email_existing">User email</label>
+                        <x-form-label for="team_email_existing" field="journal.team_user" :required="true" reqClass="jf-req">User email</x-form-label>
                         <input id="team_email_existing" name="email" type="email" class="jf-input" value="{{ old('mode') === 'existing' ? old('email') : '' }}" placeholder="person@example.com" required>
                         @error('email')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
-                        <label for="team_role_existing">Role</label>
+                        <x-form-label for="team_role_existing" field="journal.team_role">Role</x-form-label>
                         <select id="team_role_existing" name="role" class="jf-select">
                             @foreach(JournalTeamRoles::all() as $role)
                                 <option value="{{ $role }}" @selected(old('role', JournalTeamRoles::ADMIN) === $role)>{{ JournalTeamRoles::label($role) }}</option>

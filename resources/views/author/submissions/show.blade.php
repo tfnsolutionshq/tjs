@@ -45,6 +45,7 @@
 
 @php
     $canRevise = in_array($submission->status, ['revision_requested', 'resubmitted'], true);
+    $reviewType = $submission->effectiveReviewType();
 @endphp
 
 <div class="sd">
@@ -56,6 +57,7 @@
         <header class="sd-hero">
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem">
                 <span class="mp-badge mp-badge--{{ $submission->status }}">{{ str_replace('_', ' ', $submission->status) }}</span>
+                <span class="mp-badge">{{ \App\Support\ReviewType::label($reviewType) }}</span>
                 @if($submission->journal)
                     <a href="{{ route('journals.show', $submission->journal) }}" style="font-size:.84rem;font-weight:700;color:#1d4ed8;text-decoration:none" target="_blank" rel="noopener">
                         {{ $submission->journal->title }} ↗
@@ -139,23 +141,23 @@
                 >
                     @csrf
                     <div class="mp-field">
-                        <label for="document">Revised document <span style="color:#b91c1c">*</span></label>
+                        <x-form-label for="document" field="submission.revision_file" required>Revised document</x-form-label>
                         <input
                             id="document"
                             name="document"
                             type="file"
                             required
-                            accept=".pdf,.doc,.docx"
+                            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             class="mp-file"
-                            :disabled="submitting"
                             @change="fileName = $event.target.files?.[0]?.name || ''"
                         >
+                        <p class="mp-hint">DOC or DOCX only · max 50MB · PDFs are not accepted</p>
                         <p class="mp-hint" x-show="fileName" x-cloak x-text="fileName"></p>
                         @error('document')<p class="mp-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="mp-field">
-                        <label for="notes">Notes for editors</label>
-                        <textarea id="notes" name="notes" rows="3" class="mp-textarea" placeholder="Summarize what changed…" :readonly="submitting">{{ old('notes') }}</textarea>
+                        <x-form-label for="notes" field="submission.revision_notes">Notes for editors</x-form-label>
+                        <textarea id="notes" name="notes" rows="3" class="mp-textarea" placeholder="Summarize what changed…">{{ old('notes') }}</textarea>
                         @error('notes')<p class="mp-error">{{ $message }}</p>@enderror
                     </div>
                     <button type="submit" class="mp-btn mp-btn-primary" style="width:fit-content" :disabled="submitting">
@@ -203,6 +205,20 @@
                     <div class="sd-kv__row">
                         <span>Current</span>
                         <span>{{ str_replace('_', ' ', $submission->status) }}</span>
+                    </div>
+                    <div class="sd-kv__row">
+                        <span>Target issue</span>
+                        <span>{{ $submission->issue?->label() ?? '—' }}</span>
+                    </div>
+                    @if($submission->announcement)
+                        <div class="sd-kv__row">
+                            <span>Call</span>
+                            <span>{{ $submission->announcement->title }}</span>
+                        </div>
+                    @endif
+                    <div class="sd-kv__row">
+                        <span>Review type</span>
+                        <span>{{ \App\Support\ReviewType::label($reviewType) }}</span>
                     </div>
                     <div class="sd-kv__row">
                         <span>Submitted</span>

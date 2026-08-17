@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -22,6 +24,7 @@ class User extends Authenticatable
         'affiliation',
         'orcid',
         'bio',
+        'avatar_path',
         'position',
         'is_public_reviewer',
     ];
@@ -43,6 +46,28 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function avatarUrl(): ?string
+    {
+        if (! $this->avatar_path) {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar_path, 'http://') || str_starts_with($this->avatar_path, 'https://')) {
+            return $this->avatar_path;
+        }
+
+        if (Storage::disk('public')->exists($this->avatar_path)) {
+            return Storage::disk('public')->url($this->avatar_path);
+        }
+
+        return null;
+    }
+
+    public function avatarInitial(): string
+    {
+        return strtoupper(substr(trim((string) $this->name) ?: 'U', 0, 1));
     }
 
     public function isEditor(): bool
@@ -227,5 +252,32 @@ class User extends Authenticatable
     public function submissions(): HasMany
     {
         return $this->hasMany(Submission::class, 'author_id');
+    }
+
+    public function reviewerRequests(): HasMany
+    {
+        return $this->hasMany(JournalReviewerRequest::class);
+    }
+
+    /**
+     * True when the user participates in a journal via paid membership or authorship.
+     */
+    public function isJournalMember(Journal $journal): bool
+    {
+        if ($this->memberships()
+            ->where('journal_id', $journal->id)
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->exists()) {
+            return true;
+        }
+
+        return $this->submissions()->where('journal_id', $journal->id)->exists();
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        app(\App\Services\Auth\EmailVerificationOtpService::class)->issue($this);
     }
 }

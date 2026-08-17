@@ -2,69 +2,382 @@
 
 @section('title', 'Memberships | '.config('tjs.name'))
 @section('page_title', 'Memberships')
-@section('page_subtitle', 'Your access plans and available upgrades')
+@section('page_subtitle', 'Manage your access to members-only journal content')
 
 @section('content')
 @if (session('status'))
     <div class="mp-flash">{{ session('status') }}</div>
 @endif
 
-<div class="mp-grid mp-grid--2">
-    <section class="mp-card">
-        <div class="mp-card__head">
-            <div>
-                <h2 class="mp-card__title">Active memberships</h2>
-                <p class="mp-card__desc">Current access to members-only content.</p>
-            </div>
-        </div>
-        <div class="mp-card__body">
-            @forelse($activeMemberships as $membership)
-                <div class="mp-row">
-                    <div>
-                        <p class="mp-row__title">{{ $membership->plan?->name ?? 'Membership' }}</p>
-                        <p class="mp-row__meta">
-                            Ends {{ optional($membership->ends_at)->format('M j, Y') }}
-                            @if($membership->journal) · {{ $membership->journal->title }} @endif
-                        </p>
-                    </div>
-                    <span class="mp-badge mp-badge--{{ $membership->scope === 'platform' ? 'platform' : 'journal' }}">{{ $membership->scope }}</span>
-                </div>
-            @empty
-                <p class="mp-empty">You do not have an active membership yet.</p>
-            @endforelse
-        </div>
-    </section>
+@php
+    $activeCount = $activeMemberships->count();
+    $availableCount = $availablePlans->count();
+    $hasPlatform = $activeMemberships->contains(fn ($m) => $m->scope === 'platform');
+@endphp
 
-    <section class="mp-card">
-        <div class="mp-card__head">
-            <div>
-                <h2 class="mp-card__title">Available plans</h2>
-                <p class="mp-card__desc">Unlock members-only full text for a journal or the whole platform.</p>
-            </div>
-        </div>
-        <div class="mp-card__body" style="display:grid;gap:.65rem">
-            @forelse($plans as $plan)
-                <div class="mp-row" style="padding:.9rem 1rem;border:1px solid var(--line);border-radius:.85rem;background:#f8fafc;border-bottom:1px solid var(--line)">
-                    <div>
-                        <p class="mp-row__title">{{ $plan->name }}</p>
-                        <p class="mp-row__meta">
-                            <span class="mp-badge mp-badge--{{ $plan->scope }}">{{ $plan->scope }}</span>
-                            @if($plan->journal) {{ $plan->journal->title }} · @endif
-                            ₦{{ number_format($plan->price_amount) }} · {{ $plan->duration_days }} days
-                        </p>
-                    </div>
-                    <form method="POST" action="{{ route('payments.memberships.buy', $plan) }}" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault() } else { submitting = true }">
-                        @csrf
-                        <button type="submit" class="mp-btn mp-btn-primary" style="padding:.55rem .85rem;font-size:.8rem" :disabled="submitting">
-                            <span class="mp-spinner" x-show="submitting" x-cloak></span>
-                            <span x-text="submitting ? 'Redirecting…' : 'Become a member'"></span>
-                        </button>
-                    </form>
+<style>
+    .ms-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+        margin-bottom: 1.15rem;
+    }
+    @media (min-width: 760px) {
+        .ms-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .ms-stat {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: .95rem;
+        padding: .95rem 1rem;
+        box-shadow: 0 8px 24px rgba(15,23,42,.035);
+    }
+    .ms-stat__label {
+        margin: 0;
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+    .ms-stat__value {
+        margin: .35rem 0 0;
+        font-size: 1.45rem;
+        font-weight: 800;
+        letter-spacing: -.03em;
+        color: var(--ink);
+        line-height: 1;
+    }
+    .ms-section { margin-bottom: 1.15rem; }
+    .ms-section__head { margin-bottom: .75rem; }
+    .ms-section__title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--ink);
+        letter-spacing: -.01em;
+    }
+    .ms-section__desc {
+        margin: .3rem 0 0;
+        font-size: .82rem;
+        color: var(--muted);
+        line-height: 1.45;
+    }
+    .ms-grid {
+        display: grid;
+        gap: .85rem;
+    }
+    @media (min-width: 860px) {
+        .ms-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .ms-access {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 1rem 1.05rem;
+        box-shadow: 0 8px 24px rgba(15,23,42,.035);
+    }
+    .ms-access__top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .65rem;
+    }
+    .ms-access__title {
+        margin: 0;
+        font-size: .95rem;
+        font-weight: 800;
+        color: var(--ink);
+    }
+    .ms-access__meta {
+        margin: .25rem 0 0;
+        font-size: .76rem;
+        color: var(--muted);
+        line-height: 1.45;
+    }
+    .ms-access__badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .24rem .58rem;
+        font-size: .66rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        background: #ecfdf5;
+        color: #047857;
+    }
+    .ms-access__badge--platform { background: #ecfdf5; color: #047857; }
+    .ms-access__badge--journal { background: #eef4fc; color: #255ea8; }
+    .ms-progress {
+        margin-top: .85rem;
+    }
+    .ms-progress__bar {
+        height: .45rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+    .ms-progress__fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #2563eb, #38bdf8);
+    }
+    .ms-progress__fill.is-low { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .ms-progress__label {
+        display: flex;
+        justify-content: space-between;
+        gap: .5rem;
+        margin-top: .4rem;
+        font-size: .72rem;
+        color: var(--muted);
+    }
+    .ms-access__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .45rem;
+        margin-top: .85rem;
+    }
+    .ms-plan {
+        display: flex;
+        flex-direction: column;
+        gap: .85rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 1rem 1.05rem;
+        box-shadow: 0 8px 24px rgba(15,23,42,.035);
+    }
+    @media (min-width: 640px) {
+        .ms-plan { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+    .ms-plan__price {
+        margin: .45rem 0 0;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--ink);
+        letter-spacing: -.02em;
+    }
+    .ms-plan__price span {
+        font-size: .78rem;
+        font-weight: 650;
+        color: var(--muted);
+    }
+    .ms-plan__features {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        margin-top: .55rem;
+    }
+    .ms-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .22rem .55rem;
+        font-size: .68rem;
+        font-weight: 700;
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+    .ms-covered {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: .95rem;
+        padding: .85rem 1rem;
+    }
+    .ms-covered__title {
+        margin: 0;
+        font-size: .88rem;
+        font-weight: 750;
+        color: #334155;
+    }
+    .ms-covered__meta {
+        margin: .2rem 0 0;
+        font-size: .74rem;
+        color: var(--muted);
+    }
+    .ms-empty {
+        background: #fff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 1rem;
+        padding: 1.35rem 1.1rem;
+        text-align: center;
+    }
+    .ms-empty__title {
+        margin: 0;
+        font-size: .92rem;
+        font-weight: 800;
+        color: var(--ink);
+    }
+    .ms-empty__text {
+        margin: .4rem auto 0;
+        max-width: 28rem;
+        font-size: .82rem;
+        color: var(--muted);
+        line-height: 1.5;
+    }
+</style>
+
+<div class="ms-stats">
+    <div class="ms-stat">
+        <p class="ms-stat__label">Active plans</p>
+        <p class="ms-stat__value">{{ number_format($activeCount) }}</p>
+    </div>
+    <div class="ms-stat">
+        <p class="ms-stat__label">Available to buy</p>
+        <p class="ms-stat__value">{{ number_format($availableCount) }}</p>
+    </div>
+    <div class="ms-stat">
+        <p class="ms-stat__label">Platform access</p>
+        <p class="ms-stat__value">{{ $hasPlatform ? 'Yes' : 'No' }}</p>
+    </div>
+</div>
+
+<section class="ms-section">
+    <div class="ms-section__head">
+        <h2 class="ms-section__title">Your active access</h2>
+        <p class="ms-section__desc">Memberships currently unlocking members-only articles.</p>
+    </div>
+
+    @forelse($activeMemberships as $membership)
+        @php
+            $totalDays = max(1, $membership->starts_at?->diffInDays($membership->ends_at) ?? 1);
+            $daysLeft = max(0, (int) now()->diffInDays($membership->ends_at, false));
+            $progress = min(100, max(4, ($daysLeft / $totalDays) * 100));
+            $low = $daysLeft <= 30;
+        @endphp
+        <article class="ms-access" style="margin-bottom:.85rem">
+            <div class="ms-access__top">
+                <div>
+                    <h3 class="ms-access__title">{{ $membership->plan?->name ?? 'Membership' }}</h3>
+                    <p class="ms-access__meta">
+                        @if($membership->scope === 'platform')
+                            Full platform access
+                        @elseif($membership->journal)
+                            {{ $membership->journal->title }}
+                        @else
+                            Journal membership
+                        @endif
+                        · expires {{ optional($membership->ends_at)->format('M j, Y') }}
+                    </p>
                 </div>
-            @empty
-                <p class="mp-empty">No membership plans are available right now.</p>
-            @endforelse
+                <span class="ms-access__badge ms-access__badge--{{ $membership->scope === 'platform' ? 'platform' : 'journal' }}">
+                    Active · {{ $membership->scope }}
+                </span>
+            </div>
+
+            <div class="ms-progress">
+                <div class="ms-progress__bar" aria-hidden="true">
+                    <div class="ms-progress__fill {{ $low ? 'is-low' : '' }}" style="width: {{ $progress }}%"></div>
+                </div>
+                <div class="ms-progress__label">
+                    <span>{{ $daysLeft }} {{ Str::plural('day', $daysLeft) }} remaining</span>
+                    <span>{{ round($progress) }}% of term left</span>
+                </div>
+            </div>
+
+            @if($membership->journal)
+                <div class="ms-access__actions">
+                    <a href="{{ route('journals.show', $membership->journal) }}" class="mp-btn mp-btn-secondary" style="padding:.5rem .8rem;font-size:.78rem">View journal</a>
+                </div>
+            @endif
+        </article>
+    @empty
+        <div class="ms-empty">
+            <p class="ms-empty__title">No active membership yet</p>
+            <p class="ms-empty__text">Choose a plan below to unlock members-only full text for a journal or the whole platform.</p>
+        </div>
+    @endforelse
+</section>
+
+@if($coveredPlans->isNotEmpty())
+    <section class="ms-section">
+        <div class="ms-section__head">
+            <h2 class="ms-section__title">Already covered</h2>
+            <p class="ms-section__desc">These plans are included in your current access — no need to pay again.</p>
+        </div>
+        <div class="ms-grid ms-grid--2">
+            @foreach($coveredPlans as $row)
+                @php
+                    /** @var \App\Models\MembershipPlan $plan */
+                    $plan = $row['plan'];
+                    $via = $row['membership'];
+                @endphp
+                <div class="ms-covered">
+                    <p class="ms-covered__title">{{ $plan->name }}</p>
+                    <p class="ms-covered__meta">
+                        Covered by {{ $via?->plan?->name ?? 'your active membership' }}
+                        @if($via?->ends_at) until {{ $via->ends_at->format('M j, Y') }} @endif
+                    </p>
+                </div>
+            @endforeach
         </div>
     </section>
-</div>
+@endif
+
+<section class="ms-section">
+    <div class="ms-section__head">
+        <h2 class="ms-section__title">Plans you can purchase</h2>
+        <p class="ms-section__desc">Add journal access or upgrade to platform-wide membership.</p>
+    </div>
+
+    @forelse($availablePlans as $plan)
+        <article class="ms-plan" style="margin-bottom:.85rem">
+            <div>
+                <div class="ms-plan__features">
+                    <span class="mp-badge mp-badge--{{ $plan->scope }}">{{ $plan->scope }}</span>
+                    @if($plan->journal)
+                        <span class="ms-chip">{{ $plan->journal->title }}</span>
+                    @endif
+                    <span class="ms-chip">{{ $plan->duration_days }} days</span>
+                </div>
+                <h3 class="ms-access__title" style="margin-top:.55rem">{{ $plan->name }}</h3>
+                <p class="ms-plan__price">
+                    ₦{{ number_format($plan->price_amount) }}
+                    <span>/ {{ strtoupper($plan->currency ?: 'NGN') }}</span>
+                </p>
+            </div>
+            <form
+                method="POST"
+                action="{{ route('payments.memberships.buy', $plan) }}"
+                x-data="{ submitting: false }"
+                @submit="if (submitting) { $event.preventDefault() } else { submitting = true }"
+            >
+                @csrf
+                <button type="submit" class="mp-btn mp-btn-primary" style="padding:.62rem 1rem;font-size:.82rem;white-space:nowrap" :disabled="submitting">
+                    <span class="mp-spinner" x-show="submitting" x-cloak></span>
+                    <span x-text="submitting ? 'Redirecting…' : 'Purchase plan'"></span>
+                </button>
+            </form>
+        </article>
+    @empty
+        <div class="ms-empty">
+            <p class="ms-empty__title">You're fully covered</p>
+            <p class="ms-empty__text">Every available plan is already included in your active membership. Check back later for renewals or new journals.</p>
+        </div>
+    @endforelse
+</section>
+
+@if(($reviewerRequestJournals ?? collect())->isNotEmpty())
+    <section class="ms-section">
+        <div class="ms-section__head">
+            <h2 class="ms-section__title">Volunteer as a reviewer</h2>
+            <p class="ms-section__desc">Journal members can request to join the peer-review team.</p>
+        </div>
+        <div class="ms-grid ms-grid--2">
+            @foreach($reviewerRequestJournals as $row)
+                <x-reviewer-request-panel
+                    :journal="$row['journal']"
+                    :can-request="$row['canRequest']"
+                    :reason="$row['reason']"
+                    :pending="$row['pending']"
+                    :latest="$row['latest']"
+                    compact
+                />
+            @endforeach
+        </div>
+    </section>
+@endif
 @endsection

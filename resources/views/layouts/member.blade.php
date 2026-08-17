@@ -126,6 +126,7 @@
             display: inline-flex; align-items: center; justify-content: center;
             background: var(--blue-strong); color: #fff;
             font-size: .75rem; font-weight: 800;
+            overflow: hidden; flex-shrink: 0;
         }
         .admin-user__name { font-size: .84rem; font-weight: 700; color: #fff; line-height: 1.15; }
         .admin-user__role { font-size: .7rem; color: rgba(255,255,255,.42); text-transform: capitalize; }
@@ -697,7 +698,13 @@
 
             <div class="admin-nav__footer">
                 <div class="admin-user">
-                    <span class="admin-user__avatar">{{ strtoupper(substr($mpUser->name ?? 'M', 0, 1)) }}</span>
+                    <span class="admin-user__avatar">
+                        @if($mpUser?->avatarUrl())
+                            <img src="{{ $mpUser->avatarUrl() }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px;display:block">
+                        @else
+                            {{ strtoupper(substr($mpUser->name ?? 'M', 0, 1)) }}
+                        @endif
+                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="admin-user__name truncate">{{ $mpUser->name }}</p>
                         <p class="admin-user__role">

@@ -139,6 +139,18 @@
         .auth-btn-green { background: var(--green); box-shadow: 0 8px 20px rgba(31,138,91,.25); }
         .auth-btn-green:disabled,
         .auth-btn-green.is-loading { box-shadow: 0 4px 12px rgba(31,138,91,.18); }
+        .auth-btn-secondary {
+            background: #fff;
+            color: var(--ink);
+            border: 1px solid #e2e8f0;
+            box-shadow: none;
+        }
+        .auth-btn-secondary:hover {
+            filter: none;
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            box-shadow: none;
+        }
         .auth-link { color: var(--blue); font-weight: 600; text-decoration: none; transition: opacity .15s ease; }
         .auth-link:hover { text-decoration: underline; opacity: .85; }
         .auth-muted { color: var(--muted); font-size: .9rem; line-height: 1.5; }

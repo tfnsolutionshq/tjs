@@ -8,17 +8,25 @@
 <section class="mp-card">
     <div class="mp-card__body" style="padding-top:1.1rem">
         @forelse($assignments as $assignment)
-            @php $submission = $assignment->submission; @endphp
+            @php
+                $submission = $assignment->submission;
+                $reviewType = $submission?->effectiveReviewType();
+            @endphp
             <a class="mp-row" href="{{ route('reviewer.reviews.show', $submission) }}">
                 <div class="min-w-0" style="flex:1">
                     <p class="mp-row__title">{{ $submission?->title }}</p>
                     <p class="mp-row__meta">
                         {{ $submission?->journal?->title }}
-                        · {{ $submission?->author?->name }}
+                        @if(\App\Support\ReviewType::isOpen($reviewType))
+                            · {{ $submission?->author?->name }}
+                        @else
+                            · Author withheld (closed review)
+                        @endif
                         @if($assignment->due_at) · Due {{ \Illuminate\Support\Carbon::parse($assignment->due_at)->format('M j, Y') }}@endif
                     </p>
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+                    <span class="mp-badge">{{ \App\Support\ReviewType::label($reviewType) }}</span>
                     <span class="mp-badge">Priority {{ $assignment->priority }}</span>
                     <span class="mp-badge">{{ str_replace('_', ' ', $assignment->status) }}</span>
                 </div>

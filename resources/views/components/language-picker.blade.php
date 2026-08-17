@@ -23,7 +23,7 @@
     @keydown.escape.window="open = false"
     @click.outside="open = false"
 >
-    <label for="{{ $id }}-search">{{ $label }}</label>
+    <x-form-label for="{{ $id }}-search" field="journal.language">{{ $label }}</x-form-label>
     <input type="hidden" name="{{ $name }}" :value="value" id="{{ $id }}">
 
     <button

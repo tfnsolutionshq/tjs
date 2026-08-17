@@ -58,6 +58,9 @@
         $fields = [];
         foreach (['surname', 'given_names', 'middle_name', 'email', 'affiliation', 'nationality', 'orcid', 'role'] as $key) {
             $value = trim((string) ($row[$key] ?? ''));
+            if ($key === 'nationality' && $value !== '') {
+                $value = \App\Support\Nationalities::normalize($value) ?? $value;
+            }
             if ($value !== '') {
                 $fields[] = ['key' => $key, 'value' => $value];
             }
@@ -70,6 +73,11 @@
 
     $licenseOptions = \App\Support\Licenses::options();
     $licenseValue = \App\Support\Licenses::normalize(old('license', $article->license ?? '')) ?? '';
+    $nationalities = \App\Support\Nationalities::forPicker();
+    $authorFieldHelp = collect(['surname', 'given_names', 'middle_name', 'email', 'affiliation', 'nationality', 'orcid', 'role'])
+        ->mapWithKeys(fn (string $key) => [$key => \App\Support\FormHelp::get('author.'.$key)])
+        ->filter()
+        ->all();
 @endphp
 
 <style>
@@ -85,7 +93,7 @@
 
     .af-card {
         background: #fff; border: 1px solid var(--line); border-radius: 1.05rem;
-        box-shadow: 0 8px 24px rgba(15,23,42,.035); overflow: hidden;
+        box-shadow: 0 8px 24px rgba(15,23,42,.035); overflow: visible;
     }
     .af-card__head { padding: 1rem 1.15rem .15rem; }
     .af-card__title { margin: 0; font-size: .95rem; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
@@ -227,15 +235,19 @@
         display: block; margin-bottom: .4rem;
         font-size: .78rem; font-weight: 700; color: #334155; letter-spacing: .01em;
     }
+    .af-field { overflow: visible; }
     .af-req { color: #dc2626; font-weight: 800; margin-left: .15rem; }
     .af-field .af-hint { margin: .4rem 0 0; font-size: .72rem; color: var(--muted); line-height: 1.4; }
     .af-field .af-error { margin: .4rem 0 0; font-size: .75rem; font-weight: 600; color: #b91c1c; }
 
-    .af-authors { display: grid; gap: .75rem; }
+    .af-authors { display: grid; gap: .75rem; overflow: visible; }
     .af-author {
         border: 1px solid #e2e8f0; border-radius: .95rem; background: #f8fafc;
-        padding: .85rem .9rem; display: grid; gap: .7rem;
+        padding: .85rem .9rem; display: grid; gap: .7rem; overflow: visible;
+        position: relative; z-index: 1;
     }
+    .af-author:has(.af-nat.is-open),
+    .af-author:has(.af-nat:focus-within) { z-index: 40; }
     .af-author__top {
         display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
     }
@@ -256,10 +268,11 @@
         padding: .25rem .4rem; border-radius: .45rem; flex-shrink: 0;
     }
     .af-author__remove:hover { color: #b91c1c; background: #fef2f2; }
-    .af-author__rows { display: grid; gap: .4rem; }
+    .af-author__rows { display: grid; gap: .4rem; overflow: visible; }
     .af-author__row {
         display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: .4rem; align-items: center;
         background: #fff; border: 1px solid #e2e8f0; border-radius: .65rem; padding: .35rem .4rem .35rem .55rem;
+        overflow: visible; position: relative;
     }
     @media (max-width: 560px) {
         .af-author__row { grid-template-columns: 1fr auto; }
@@ -280,8 +293,12 @@
     .af-author__row-del:hover { color: #b91c1c; background: #fef2f2; }
     .af-author__add {
         display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr) auto;
-        gap: .45rem; align-items: center;
+        gap: .45rem; align-items: center; overflow: visible; position: relative;
     }
+    .af-author__add:has(.af-nat) {
+        grid-template-columns: minmax(8rem, 11rem) minmax(12rem, 1fr) auto;
+    }
+    .af-author__add .af-nat { min-width: 0; }
     @media (max-width: 560px) {
         .af-author__add { grid-template-columns: 1fr; }
     }
@@ -316,6 +333,62 @@
         font-size: .78rem; font-weight: 700; color: #475569; cursor: pointer; user-select: none;
     }
     .af-author__check input { accent-color: #2563eb; }
+    .af-nat { position: relative; min-width: 0; z-index: 1; }
+    .af-nat.is-open,
+    .af-nat:focus-within { z-index: 50; }
+    .af-nat__trigger {
+        width: 100%; display: flex; align-items: center; gap: .55rem;
+        border: 1px solid #e2e8f0; background: #fff; border-radius: .55rem;
+        padding: .45rem .55rem; cursor: pointer; text-align: left;
+        font: inherit; color: var(--ink);
+    }
+    .af-nat__trigger:hover { border-color: #cbd5e1; }
+    .af-nat__trigger:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .af-nat__flag {
+        width: 1.35rem; height: .95rem; object-fit: cover;
+        border-radius: .18rem; border: 1px solid rgba(15,23,42,.08);
+        flex-shrink: 0; background: #f1f5f9;
+    }
+    .af-nat__name {
+        font-size: .84rem; font-weight: 650; color: var(--ink);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+    }
+    .af-nat__name.is-empty { color: #94a3b8; font-weight: 600; }
+    .af-nat__chevron {
+        width: .95rem; height: .95rem; color: #94a3b8; flex-shrink: 0;
+        transition: transform .15s ease;
+    }
+    .af-nat__chevron.is-open { transform: rotate(180deg); }
+    .af-nat__menu {
+        position: absolute; z-index: 60; left: 0; top: calc(100% + .35rem);
+        width: max(100%, 16.5rem); min-width: 16.5rem;
+        background: #fff; border: 1px solid var(--line); border-radius: .75rem;
+        box-shadow: 0 14px 34px rgba(15,23,42,.12); overflow: hidden;
+    }
+    .af-nat__search {
+        display: flex; align-items: center; gap: .45rem;
+        padding: .55rem .65rem; border-bottom: 1px solid var(--line); background: #f8fafc;
+    }
+    .af-nat__search svg { width: .9rem; height: .9rem; color: var(--muted); flex-shrink: 0; }
+    .af-nat__search input {
+        width: 100%; border: 0; outline: 0; background: transparent;
+        font: inherit; font-size: .82rem; color: var(--ink);
+    }
+    .af-nat__list {
+        list-style: none; margin: 0; padding: .3rem;
+        max-height: 13rem; overflow: auto;
+    }
+    .af-nat__option {
+        width: 100%; display: flex; align-items: center; gap: .55rem;
+        border: 0; background: transparent; border-radius: .5rem;
+        padding: .45rem .5rem; cursor: pointer; text-align: left; font: inherit;
+    }
+    .af-nat__option:hover,
+    .af-nat__option.is-hot { background: #f1f5f9; }
+    .af-nat__option.is-active { background: #eff6ff; }
+    .af-nat__empty {
+        padding: .75rem .65rem; font-size: .78rem; color: var(--muted); text-align: center;
+    }
     .af-authors__empty {
         border: 1.5px dashed #cbd5e1; border-radius: .95rem; background: #fff;
         padding: 1.1rem 1rem; text-align: center; color: var(--muted); font-size: .82rem; line-height: 1.45;
@@ -358,6 +431,121 @@
     }
     .af-input.is-filled, .af-textarea.is-filled {
         border-color: #86efac; background: #f0fdf4;
+    }
+
+    .af-price {
+        display: grid;
+        grid-template-columns: 8.25rem minmax(0, 1fr);
+        gap: .5rem;
+        align-items: stretch;
+    }
+    @media (max-width: 420px) {
+        .af-price { grid-template-columns: 1fr; }
+    }
+    .af-price__currency {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        border: 1px solid #e2e8f0;
+        border-radius: .7rem;
+        background: #fff;
+        padding: 0 .45rem 0 .65rem;
+        min-height: 2.75rem;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .af-price__currency:hover { border-color: #cbd5e1; }
+    .af-price__currency:focus-within {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .af-price__flag {
+        width: 1.35rem;
+        height: .95rem;
+        object-fit: cover;
+        border-radius: .18rem;
+        border: 1px solid rgba(15,23,42,.08);
+        flex-shrink: 0;
+        background: #f1f5f9;
+    }
+    .af-price__select {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        padding: .65rem 1.1rem .65rem 0;
+        font: inherit;
+        font-size: .82rem;
+        font-weight: 800;
+        color: var(--ink);
+        outline: none;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0 center;
+        background-size: .85rem;
+    }
+    .af-price__amount {
+        display: flex;
+        align-items: center;
+        border: 1px solid #e2e8f0;
+        border-radius: .7rem;
+        background: #fff;
+        min-height: 2.75rem;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .af-price__amount:hover { border-color: #cbd5e1; }
+    .af-price__amount:focus-within {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .af-price__symbol {
+        padding: 0 .1rem 0 .85rem;
+        font-size: .95rem;
+        font-weight: 800;
+        color: #64748b;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .af-price__input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        padding: .65rem .85rem .65rem .35rem;
+        font: inherit;
+        font-size: .9rem;
+        color: var(--ink);
+        outline: none;
+    }
+    .af-price__input::placeholder { color: #94a3b8; }
+    .af-price__preview {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .35rem .55rem;
+        margin-top: .55rem;
+        padding: .55rem .7rem;
+        border: 1px dashed #dbeafe;
+        border-radius: .65rem;
+        background: #f8fbff;
+        font-size: .74rem;
+        color: #475569;
+        line-height: 1.45;
+    }
+    .af-price__preview strong {
+        font-size: .82rem;
+        font-weight: 800;
+        color: #1d4ed8;
+    }
+    .af-price__preview img {
+        width: 1.1rem;
+        height: .78rem;
+        object-fit: cover;
+        border-radius: .15rem;
+        border: 1px solid rgba(15,23,42,.08);
+        vertical-align: middle;
     }
 
     .af-file {
@@ -421,11 +609,20 @@
         journalId: @js($defaultJournalId),
         issueId: @js((string) old('issue_id', $article->issue_id ?? '')),
         catalog: @js($catalog ?? ['volumes' => [], 'issues' => []]),
-        categories: @js($categories->map(fn ($c) => ['id' => (string) $c->id, 'name' => $c->name, 'slug' => $c->slug])->values()),
+        categories: @js($categories->map(fn ($c) => [
+            'id' => (string) $c->id,
+            'name' => $c->name,
+            'slug' => $c->slug,
+            'journal_id' => (string) ($c->journal_id ?? ''),
+        ])->values()),
         selectedCategoryIds: @js($selectedCategoryIds),
         initialAuthors: @js($authorsForAlpine),
         licenseOptions: @js($licenseOptions),
         license: @js($licenseValue),
+        nationalities: @js($nationalities),
+        authorFieldHelp: @js($authorFieldHelp),
+        priceAmount: @js(old('price_amount', $article->price_amount ?? '')),
+        currency: @js(old('currency', $article->currency ?? 'NGN')),
     })"
 >
     @csrf
@@ -585,23 +782,24 @@
             <div class="af-card__body">
                 <div class="af-grid af-grid--2">
                     <div class="af-field">
-                        <label for="journal_id">Journal <span class="af-req" title="Required">*</span></label>
                         @if($manageJournal)
+                            <x-form-label for="journal_id" field="article.journal_id" :required="true" reqClass="af-req">Journal</x-form-label>
                             <input type="hidden" name="journal_id" value="{{ $manageJournal->id }}">
                             <div class="af-input" style="display:flex;align-items:center;background:#f8fafc;font-weight:700">{{ $manageJournal->title }}</div>
                             <p class="af-hint">Locked to this journal’s manage portal.</p>
                         @else
-                            <select id="journal_id" name="journal_id" required class="af-select" x-model="journalId" @change="onJournalChange()">
-                                <option value="">Select journal</option>
-                                @foreach($journals as $j)
-                                    <option value="{{ $j->id }}">{{ $j->title }}</option>
-                                @endforeach
-                            </select>
+                            <x-form-label for="journal_id" field="article.journal_id" :required="true" reqClass="af-req">Journal</x-form-label>
+                            <x-journal-picker
+                                :journals="$journals"
+                                :value="$defaultJournalId"
+                                required
+                                @picker-change="journalId = $event.detail; onJournalChange()"
+                            />
                             @error('journal_id')<p class="af-error">{{ $message }}</p>@enderror
                         @endif
                     </div>
                     <div class="af-field">
-                        <label for="issue_id">Issue</label>
+                        <x-form-label for="issue_id" field="article.issue_id">Issue</x-form-label>
                         <select id="issue_id" name="issue_id" class="af-select" x-model="issueId" :disabled="!journalId">
                 <option value="">None</option>
                             <template x-for="issue in filteredIssues" :key="issue.id">
@@ -629,19 +827,19 @@
                     <div x-show="showVolumeForm" x-cloak>
                         <div class="af-grid af-grid--2">
                             <div class="af-field">
-                                <label>Volume number <span class="af-req">*</span></label>
+                                <x-form-label field="article.volume_number" :required="true" reqClass="af-req">Volume number</x-form-label>
                                 <input type="number" min="1" class="af-input" x-model="newVolume.volume_number" placeholder="e.g. 5">
                             </div>
                             <div class="af-field">
-                                <label>Year <span class="af-req">*</span></label>
+                                <x-form-label field="article.volume_year" :required="true" reqClass="af-req">Year</x-form-label>
                                 <input type="number" min="1900" max="2100" class="af-input" x-model="newVolume.year" placeholder="{{ now()->year }}">
                             </div>
                             <div class="af-field">
-                                <label>Title</label>
+                                <x-form-label field="article.volume_title">Title</x-form-label>
                                 <input type="text" class="af-input" x-model="newVolume.title" placeholder="Optional">
                             </div>
                             <div class="af-field">
-                                <label>Status <span class="af-req">*</span></label>
+                                <x-form-label field="article.volume_status" :required="true" reqClass="af-req">Status</x-form-label>
                                 <select class="af-select" x-model="newVolume.status">
                                     <option value="draft">Draft</option>
                                     <option value="published">Published</option>
@@ -659,7 +857,7 @@
                     <div x-show="showIssueForm" x-cloak>
                         <div class="af-grid af-grid--2">
                             <div class="af-field">
-                                <label>Volume <span class="af-req">*</span></label>
+                                <x-form-label field="article.issue_volume" :required="true" reqClass="af-req">Volume</x-form-label>
                                 <select class="af-select" x-model="newIssue.volume_id">
                                     <option value="">Select volume</option>
                                     <template x-for="volume in filteredVolumes" :key="volume.id">
@@ -668,15 +866,15 @@
                                 </select>
                             </div>
                             <div class="af-field">
-                                <label>Issue number <span class="af-req">*</span></label>
+                                <x-form-label field="article.issue_number" :required="true" reqClass="af-req">Issue number</x-form-label>
                                 <input type="number" min="1" class="af-input" x-model="newIssue.issue_number" placeholder="e.g. 2">
                             </div>
                             <div class="af-field">
-                                <label>Title</label>
+                                <x-form-label field="article.issue_title">Title</x-form-label>
                                 <input type="text" class="af-input" x-model="newIssue.title" placeholder="Optional">
                             </div>
                             <div class="af-field">
-                                <label>Status <span class="af-req">*</span></label>
+                                <x-form-label field="article.issue_status" :required="true" reqClass="af-req">Status</x-form-label>
                                 <select class="af-select" x-model="newIssue.status">
                                     <option value="draft">Draft</option>
                                     <option value="published">Published</option>
@@ -704,13 +902,13 @@
             <div class="af-card__body">
                 <div class="af-grid af-grid--2">
                     <div class="af-field af-span-2">
-                        <label for="title">Title <span class="af-req" title="Required">*</span></label>
+                        <x-form-label for="title" field="article.title" :required="true" reqClass="af-req">Title</x-form-label>
                         <input id="title" name="title" type="text" required class="af-input" x-ref="title"
                             value="{{ old('title', $article->title ?? '') }}">
                         @error('title')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field">
-                        <label for="slug">Slug</label>
+                        <x-form-label for="slug" field="article.slug">Slug</x-form-label>
                         <input id="slug" name="slug" type="text" class="af-input" x-ref="slug"
                             value="{{ old('slug', $article->slug ?? '') }}"
                             placeholder="Auto from title if blank">
@@ -718,28 +916,28 @@
                         @error('slug')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field">
-                        <label for="author_user_id">Author user ID</label>
+                        <x-form-label for="author_user_id" field="article.author_user_id">Author user ID</x-form-label>
                         <input id="author_user_id" name="author_user_id" type="number" class="af-input"
                             value="{{ old('author_user_id', $article->author_user_id ?? '') }}"
                             placeholder="Optional linked account">
                         @error('author_user_id')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field af-span-2">
-                        <label for="abstract">Abstract</label>
+                        <x-form-label for="abstract" field="article.abstract">Abstract</x-form-label>
                         <textarea id="abstract" name="abstract" rows="5" class="af-textarea" x-ref="abstract">{{ old('abstract', $article->abstract ?? '') }}</textarea>
                         @error('abstract')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field af-span-2">
-                        <label>Categories</label>
+                        <x-form-label field="article.categories">Categories</x-form-label>
                         <div class="af-cats">
-                            <template x-for="cat in categories" :key="cat.id">
+                            <template x-for="cat in journalCategories" :key="cat.id">
                                 <label class="af-cat" :class="selectedCategoryIds.includes(String(cat.id)) && 'is-on'">
                                     <input type="checkbox" name="category_ids[]" :value="cat.id" x-model="selectedCategoryIds">
                                     <span x-text="cat.name"></span>
                                 </label>
                             </template>
                         </div>
-                        <p class="af-hint" x-show="categories.length === 0" x-cloak>No categories yet — create one below.</p>
+                        <p class="af-hint" x-show="journalCategories.length === 0" x-cloak>No categories for this journal yet — create one below.</p>
                         @error('category_ids')<p class="af-error">{{ $message }}</p>@enderror
                         @error('category_ids.*')<p class="af-error">{{ $message }}</p>@enderror
 
@@ -765,13 +963,13 @@
                         </div>
                     </div>
                     <div class="af-field">
-                        <label for="keywords">Keywords</label>
+                        <x-form-label for="keywords" field="article.keywords">Keywords</x-form-label>
                         <input id="keywords" name="keywords" type="text" class="af-input" x-ref="keywords"
                             value="{{ old('keywords', $article->keywords ?? '') }}"
                             placeholder="Comma-separated">
                     </div>
                     <div class="af-field af-span-2">
-                        <label>Authors</label>
+                        <x-form-label field="article.authors">Authors</x-form-label>
                         <p class="af-hint" style="margin-top:0;margin-bottom:.65rem">
                             Add only the details you have — skip optional fields like Middle name when unknown.
                             Display name is arranged as <strong>Surname, First name</strong>.
@@ -801,7 +999,15 @@
                                     <div class="af-author__rows" x-show="author.fields.length">
                                         <template x-for="(field, fi) in author.fields" :key="field.key + '-' + fi">
                                             <div class="af-author__row">
-                                                <div class="af-author__row-key" x-text="authorKeyLabel(field.key)"></div>
+                                                <div class="af-author__row-key tjs-label-row">
+                                                    <span x-text="authorKeyLabel(field.key)"></span>
+                                                    <template x-if="authorKeyHelp(field.key)">
+                                                        <span class="tjs-field-helper" x-data="{ open: false }" @click.outside="open = false">
+                                                            <button type="button" class="tjs-field-helper__btn" @click.stop="open = !open" :aria-expanded="open" aria-label="What does this field mean?">?</button>
+                                                            <div class="tjs-field-helper__pop" x-show="open" x-cloak x-text="authorKeyHelp(field.key)"></div>
+                                                        </span>
+                                                    </template>
+                                                </div>
                                                 <template x-if="field.key === 'role'">
                                                     <select class="af-author__row-val af-author__row-val--select" x-model="field.value">
                                                         <option value="" disabled>Select role…</option>
@@ -810,7 +1016,38 @@
                                                         </template>
                                                     </select>
                                                 </template>
-                                                <template x-if="field.key !== 'role'">
+                                                <template x-if="field.key === 'nationality'">
+                                                    <div
+                                                        class="af-nat af-author__row-val"
+                                                        :class="{ 'is-open': open }"
+                                                        x-data="afNationalityPicker({ countries: nationalities, initial: field.value, onChange(v) { field.value = v } })"
+                                                        @click.outside="open = false"
+                                                    >
+                                                        <button type="button" class="af-nat__trigger" @click="toggle()">
+                                                            <img :src="selectedFlag" alt="" class="af-nat__flag" x-show="selectedFlag" x-cloak>
+                                                            <span class="af-nat__name" :class="!selectedName && 'is-empty'" x-text="selectedName || 'Select nationality…'"></span>
+                                                            <svg class="af-nat__chevron" :class="open && 'is-open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/></svg>
+                                                        </button>
+                                                        <div class="af-nat__menu" x-show="open" x-cloak>
+                                                            <div class="af-nat__search">
+                                                                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+                                                                <input type="text" x-ref="search" x-model="query" placeholder="Search countries…" @keydown.escape.stop="open = false" @keydown.arrow-down.prevent="highlightNext()" @keydown.arrow-up.prevent="highlightPrev()" @keydown.enter.prevent="pickFirst()">
+                                                            </div>
+                                                            <ul class="af-nat__list">
+                                                                <template x-for="(country, ci) in filtered" :key="country.code">
+                                                                    <li>
+                                                                        <button type="button" class="af-nat__option" :class="{ 'is-active': country.name === value, 'is-hot': ci === hot }" @click="select(country)">
+                                                                            <img :src="country.flag_url" alt="" class="af-nat__flag">
+                                                                            <span class="af-nat__name" x-text="country.name"></span>
+                                                                        </button>
+                                                                    </li>
+                                                                </template>
+                                                                <li x-show="!filtered.length" class="af-nat__empty" x-cloak>No countries found.</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <template x-if="field.key !== 'role' && field.key !== 'nationality'">
                                                     <input
                                                         class="af-author__row-val"
                                                         type="text"
@@ -838,7 +1075,38 @@
                                                 </template>
                                             </select>
                                         </template>
-                                        <template x-if="author.pendingKey !== 'role'">
+                                        <template x-if="author.pendingKey === 'nationality'">
+                                            <div
+                                                class="af-nat"
+                                                :class="{ 'is-open': open }"
+                                                x-data="afNationalityPicker({ countries: nationalities, initial: author.pendingValue, onChange(v) { author.pendingValue = v } })"
+                                                @click.outside="open = false"
+                                            >
+                                                <button type="button" class="af-nat__trigger" @click="toggle()">
+                                                    <img :src="selectedFlag" alt="" class="af-nat__flag" x-show="selectedFlag" x-cloak>
+                                                    <span class="af-nat__name" :class="!selectedName && 'is-empty'" x-text="selectedName || 'Select nationality…'"></span>
+                                                    <svg class="af-nat__chevron" :class="open && 'is-open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/></svg>
+                                                </button>
+                                                <div class="af-nat__menu" x-show="open" x-cloak>
+                                                    <div class="af-nat__search">
+                                                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+                                                        <input type="text" x-ref="search" x-model="query" placeholder="Search countries…" @keydown.escape.stop="open = false" @keydown.arrow-down.prevent="highlightNext()" @keydown.arrow-up.prevent="highlightPrev()" @keydown.enter.prevent="pickFirst()">
+                                                    </div>
+                                                    <ul class="af-nat__list">
+                                                        <template x-for="(country, ci) in filtered" :key="'p-' + country.code">
+                                                            <li>
+                                                                <button type="button" class="af-nat__option" :class="{ 'is-active': country.name === value, 'is-hot': ci === hot }" @click="select(country)">
+                                                                    <img :src="country.flag_url" alt="" class="af-nat__flag">
+                                                                    <span class="af-nat__name" x-text="country.name"></span>
+                                                                </button>
+                                                            </li>
+                                                        </template>
+                                                        <li x-show="!filtered.length" class="af-nat__empty" x-cloak>No countries found.</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="author.pendingKey !== 'role' && author.pendingKey !== 'nationality'">
                                             <input
                                                 class="af-input"
                                                 type="text"
@@ -899,12 +1167,12 @@
             <div class="af-card__body">
                 <div class="af-grid af-grid--2">
                     <div class="af-field">
-                        <label for="doi">DOI</label>
+                        <x-form-label for="doi" field="article.doi">DOI</x-form-label>
                         <input id="doi" name="doi" type="text" class="af-input" x-ref="doi"
                             value="{{ old('doi', $article->doi ?? '') }}" placeholder="10.xxxx/…">
                     </div>
                     <div class="af-field">
-                        <label for="license">License</label>
+                        <x-form-label for="license" field="article.license">License</x-form-label>
                         <select id="license" name="license" class="af-select" x-model="license" x-ref="license">
                             <option value="">Select a license…</option>
                             @foreach($licenseOptions as $opt)
@@ -917,12 +1185,12 @@
                         @error('license')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field">
-                        <label for="page_range">Page range</label>
+                        <x-form-label for="page_range" field="article.page_range">Page range</x-form-label>
                         <input id="page_range" name="page_range" type="text" class="af-input" x-ref="page_range"
                             value="{{ old('page_range', $article->page_range ?? '') }}" placeholder="12-28">
                     </div>
                     <div class="af-field">
-                        <label for="mins_read">Minutes to read</label>
+                        <x-form-label for="mins_read" field="article.mins_read">Minutes to read</x-form-label>
                         <input id="mins_read" name="mins_read" type="number" min="1" class="af-input"
                             value="{{ old('mins_read', $article->mins_read ?? '') }}"
                             placeholder="e.g. 8">
@@ -939,7 +1207,7 @@
             </div>
             <div class="af-card__body">
                 <div class="af-field">
-                    <label for="galley">Document</label>
+                    <x-form-label for="galley" field="article.galley">Document</x-form-label>
                     <input id="galley" name="galley" type="file" accept=".pdf,.doc,.docx" class="af-file" x-ref="galley"
                         @change="galleyName = $event.target.files[0]?.name || ''">
                     <p class="af-hint" x-show="galleyName" x-cloak x-text="'Selected: ' + galleyName"></p>
@@ -966,7 +1234,10 @@
             <div class="af-card__body">
                 <div class="af-toggle">
         <div>
-                        <div class="af-toggle__label">Published <span class="af-req">*</span></div>
+                        <div class="af-toggle__label tjs-label-row">
+                            <span>Published <span class="af-req">*</span></span>
+                            <x-field-helper :text="\App\Support\FormHelp::get('article.status')" />
+                        </div>
                         <p class="af-toggle__hint">Draft stays hidden from the public catalog.</p>
                     </div>
                     <button type="button" class="af-switch" :class="status === 'published' && 'is-on'"
@@ -976,7 +1247,7 @@
                 <input type="hidden" name="status" :value="status">
 
                 <div class="af-field" style="margin-top:.85rem">
-                    <label for="visibility">Visibility <span class="af-req" title="Required">*</span></label>
+                    <x-form-label for="visibility" field="article.visibility" :required="true" reqClass="af-req">Visibility</x-form-label>
                     <select id="visibility" name="visibility" required class="af-select" x-model="visibility">
                         @foreach(['open' => 'Open', 'members_only' => 'Members only', 'paid' => 'Paid', 'closed' => 'Closed'] as $val => $label)
                             <option value="{{ $val }}">{{ $label }}</option>
@@ -985,20 +1256,55 @@
                     @error('visibility')<p class="af-error">{{ $message }}</p>@enderror
         </div>
 
-                <div class="af-grid af-grid--2" style="margin-top:.85rem" x-show="visibility === 'paid'" x-cloak>
-                    <div class="af-field">
-                        <label for="price_amount">Price (minor units) <span class="af-req">*</span></label>
-                        <input id="price_amount" name="price_amount" type="number" min="0" class="af-input"
-                            value="{{ old('price_amount', $article->price_amount ?? '') }}"
-                            :required="visibility === 'paid'">
-                        @error('price_amount')<p class="af-error">{{ $message }}</p>@enderror
+                <div class="af-field" style="margin-top:.85rem" x-show="visibility === 'paid'" x-cloak>
+                    <x-form-label for="price_amount" field="article.price_amount" :required="true" reqClass="af-req">Price</x-form-label>
+                    <div class="af-price">
+                        <div class="af-price__currency">
+                            <img
+                                class="af-price__flag"
+                                :src="currencyFlag(currency)"
+                                :alt="currencyMeta[currency]?.label || currency"
+                                width="20"
+                                height="14"
+                            >
+                            <select
+                                id="currency"
+                                name="currency"
+                                class="af-price__select"
+                                x-model="currency"
+                                :required="visibility === 'paid'"
+                                aria-label="Currency"
+                            >
+                                <option value="NGN">NGN · Naira</option>
+                                <option value="USD">USD · Dollar</option>
+                                <option value="EUR">EUR · Euro</option>
+                                <option value="GBP">GBP · Pound</option>
+                            </select>
+                        </div>
+                        <div class="af-price__amount">
+                            <span class="af-price__symbol" x-text="currencySymbol(currency)" aria-hidden="true"></span>
+                            <input
+                                id="price_amount"
+                                name="price_amount"
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="af-price__input"
+                                x-model="priceAmount"
+                                :required="visibility === 'paid'"
+                                placeholder="15000"
+                                inputmode="numeric"
+                            >
+                        </div>
                     </div>
-                    <div class="af-field">
-                        <label for="currency">Currency <span class="af-req">*</span></label>
-                        <input id="currency" name="currency" type="text" class="af-input"
-                            value="{{ old('currency', $article->currency ?? 'NGN') }}"
-                            :required="visibility === 'paid'">
+                    <div class="af-price__preview" x-show="formattedPrice()" x-cloak>
+                        <img :src="currencyFlag(currency)" :alt="currency" width="18" height="13">
+                        <span>Readers pay <strong x-text="formattedPrice()"></strong></span>
+                        <span>· stored as <strong x-text="Number(priceAmount).toLocaleString()"></strong> minor units</span>
                     </div>
+                    <p class="af-hint">Enter kobo for NGN (15000 = ₦150.00). Other currencies use cents/pence the same way.</p>
+                    @error('price_amount')<p class="af-error">{{ $message }}</p>@enderror
+                    @error('currency')<p class="af-error">{{ $message }}</p>@enderror
                 </div>
             </div>
         </div>
@@ -1018,6 +1324,87 @@
 </form>
 
 <script>
+window.afNationalityPicker = function (cfg) {
+    return {
+        countries: cfg.countries || [],
+        value: cfg.initial || '',
+        selectedName: '',
+        selectedFlag: '',
+        open: false,
+        query: '',
+        hot: 0,
+        init() {
+            this.syncSelection(this.value);
+            if (typeof cfg.onChange === 'function') {
+                this.$watch('value', (v) => cfg.onChange(v));
+            }
+        },
+        syncSelection(val) {
+            const hit = this.matchCountry(val);
+            if (hit) {
+                this.selectedName = hit.name;
+                this.selectedFlag = hit.flag_url;
+                if (this.value !== hit.name) {
+                    this.value = hit.name;
+                }
+                return;
+            }
+            this.selectedName = val ? String(val) : '';
+            this.selectedFlag = val ? 'https://flagcdn.com/un.svg' : '';
+        },
+        matchCountry(val) {
+            const text = String(val || '').trim();
+            if (!text) return null;
+            const exact = this.countries.find((c) => c.name === text);
+            if (exact) return exact;
+            const lower = text.toLowerCase();
+            const ci = this.countries.find((c) => c.name.toLowerCase() === lower);
+            if (ci) return ci;
+            let best = null;
+            this.countries.forEach((c) => {
+                const name = c.name.toLowerCase();
+                if (!lower.includes(name) && !name.includes(lower)) return;
+                if (!best || c.name.length > best.name.length) best = c;
+            });
+            return best;
+        },
+        get filtered() {
+            const q = this.query.trim().toLowerCase();
+            if (!q) return this.countries;
+            return this.countries.filter((c) =>
+                c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+            );
+        },
+        toggle() {
+            this.open = !this.open;
+            if (this.open) {
+                this.query = '';
+                this.hot = Math.max(0, this.filtered.findIndex((c) => c.name === this.value));
+                this.$nextTick(() => this.$refs.search?.focus());
+            }
+        },
+        select(country) {
+            this.value = country.name;
+            this.selectedName = country.name;
+            this.selectedFlag = country.flag_url;
+            this.open = false;
+            this.query = '';
+        },
+        pickFirst() {
+            const first = this.filtered[this.hot] || this.filtered[0];
+            if (first) this.select(first);
+        },
+        highlightNext() {
+            if (!this.filtered.length) return;
+            this.hot = (this.hot + 1) % this.filtered.length;
+        },
+        highlightPrev() {
+            if (!this.filtered.length) return;
+            this.hot = (this.hot - 1 + this.filtered.length) % this.filtered.length;
+        },
+    };
+};
+
 function articleForm(cfg) {
     const catalog = cfg.catalog || { volumes: [], issues: [] };
     return {
@@ -1046,12 +1433,20 @@ function articleForm(cfg) {
             title: '',
             status: 'published',
         },
-        categories: (cfg.categories || []).map((c) => ({ ...c, id: String(c.id) })),
+        categories: (cfg.categories || []).map((c) => ({
+            ...c,
+            id: String(c.id),
+            journal_id: c.journal_id != null ? String(c.journal_id) : '',
+        })),
         selectedCategoryIds: (cfg.selectedCategoryIds || []).map(String),
         newCategoryName: '',
         creatingCategory: false,
         categoryMsg: '',
         categoryMsgClass: '',
+        get journalCategories() {
+            if (!this.journalId) return [];
+            return this.categories.filter((c) => String(c.journal_id) === String(this.journalId));
+        },
         extractFile: null,
         extractName: '',
         galleyName: '',
@@ -1065,6 +1460,47 @@ function articleForm(cfg) {
         ocrAvailable: cfg.ocrAvailable,
         licenseOptions: cfg.licenseOptions || [],
         license: cfg.license || '',
+        nationalities: cfg.nationalities || [],
+        authorFieldHelp: cfg.authorFieldHelp || {},
+        priceAmount: cfg.priceAmount ?? '',
+        currency: (cfg.currency || 'NGN').toUpperCase(),
+        currencyMeta: {
+            NGN: { flag: 'ng', symbol: '₦', label: 'Naira' },
+            USD: { flag: 'us', symbol: '$', label: 'US Dollar' },
+            EUR: { flag: 'eu', symbol: '€', label: 'Euro' },
+            GBP: { flag: 'gb', symbol: '£', label: 'Pound Sterling' },
+        },
+
+        currencyFlag(code) {
+            const meta = this.currencyMeta[String(code || '').toUpperCase()];
+            return meta ? `https://flagcdn.com/${meta.flag}.svg` : '';
+        },
+
+        currencySymbol(code) {
+            const meta = this.currencyMeta[String(code || '').toUpperCase()];
+            return meta ? meta.symbol : String(code || '').toUpperCase();
+        },
+
+        formattedPrice() {
+            const raw = String(this.priceAmount ?? '').trim();
+            if (raw === '') return '';
+            const amount = Number(raw);
+            if (!Number.isFinite(amount) || amount < 0) return '';
+
+            const code = String(this.currency || 'NGN').toUpperCase();
+            const major = amount / 100;
+            const formatted = major.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+
+            if (code === 'NGN') return `₦${formatted}`;
+            if (code === 'USD') return `$${formatted}`;
+            if (code === 'EUR') return `€${formatted}`;
+            if (code === 'GBP') return `£${formatted}`;
+
+            return `${code} ${formatted}`;
+        },
 
         get licenseUrl() {
             const hit = (this.licenseOptions || []).find((o) => o.label === this.license);
@@ -1159,6 +1595,10 @@ function articleForm(cfg) {
             return (this.authorKeyOptions.find((o) => o.key === key) || {}).label || key;
         },
 
+        authorKeyHelp(key) {
+            return this.authorFieldHelp?.[key] || '';
+        },
+
         isOptionalAuthorKey(key) {
             return !!(this.authorKeyOptions.find((o) => o.key === key) || {}).optional;
         },
@@ -1170,7 +1610,6 @@ function articleForm(cfg) {
                 middle_name: 'e.g. Chioma',
                 email: 'name@example.com',
                 affiliation: 'University / Institute',
-                nationality: 'e.g. Nigerian',
                 orcid: '0000-0000-0000-0000',
             };
             return map[key] || 'Enter value';
@@ -1318,6 +1757,11 @@ function articleForm(cfg) {
         async createCategory() {
             const name = (this.newCategoryName || '').trim();
             if (!name || this.creatingCategory) return;
+            if (!this.journalId) {
+                this.categoryMsg = 'Select a journal before creating a category.';
+                this.categoryMsgClass = 'is-err';
+                return;
+            }
             this.creatingCategory = true;
             this.categoryMsg = '';
             try {
@@ -1330,13 +1774,18 @@ function articleForm(cfg) {
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ name }),
+                    body: JSON.stringify({ name, journal_id: this.journalId }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
                     throw new Error(data.message || Object.values(data.errors || {})[0]?.[0] || 'Could not create category');
                 }
-                const cat = { id: String(data.category.id), name: data.category.name, slug: data.category.slug };
+                const cat = {
+                    id: String(data.category.id),
+                    name: data.category.name,
+                    slug: data.category.slug,
+                    journal_id: String(data.category.journal_id ?? this.journalId),
+                };
                 if (!this.categories.some((c) => c.id === cat.id)) {
                     this.categories = [...this.categories, cat].sort((a, b) => a.name.localeCompare(b.name));
                 }

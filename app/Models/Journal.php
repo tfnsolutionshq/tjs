@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Storage;
 class Journal extends Model
 {
     protected $fillable = [
-        'slug', 'title', 'subtitle', 'description', 'issn', 'eissn', 'publisher',
-        'default_license', 'language', 'is_active', 'is_featured', 'allow_platform_admin_edits',
+        'slug', 'initials', 'title', 'subtitle', 'description', 'issn', 'eissn', 'publisher',
+        'default_license', 'language', 'review_type', 'is_active', 'is_featured', 'allow_platform_admin_edits',
         'membership_price', 'membership_days', 'cover_path',
         'theme', 'logo_path', 'header_image_path',
     ];
@@ -51,6 +51,29 @@ class Journal extends Model
     public function headerImageUrl(): ?string
     {
         return $this->publicDiskUrl($this->header_image_path);
+    }
+
+    public static function initialsFromTitle(?string $title): string
+    {
+        $words = preg_split('/\s+/', trim((string) $title)) ?: [];
+        $initials = collect($words)
+            ->filter()
+            ->take(3)
+            ->map(fn (string $word) => strtoupper(substr($word, 0, 1)))
+            ->implode('');
+
+        if (strlen($initials) < 2) {
+            $initials = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', (string) $title) ?: 'JN', 0, 3));
+        }
+
+        return substr($initials, 0, 8);
+    }
+
+    public function displayInitials(): string
+    {
+        $stored = strtoupper(trim((string) ($this->initials ?? '')));
+
+        return $stored !== '' ? $stored : self::initialsFromTitle($this->title);
     }
 
     private function publicDiskUrl(?string $path): ?string
@@ -91,6 +114,21 @@ class Journal extends Model
     public function editorialBoard(): HasMany
     {
         return $this->hasMany(EditorialBoardMember::class)->orderBy('sort_order');
+    }
+
+    public function reviewerRequests(): HasMany
+    {
+        return $this->hasMany(JournalReviewerRequest::class);
+    }
+
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(JournalAnnouncement::class);
+    }
+
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class)->orderBy('sort_order')->orderBy('name');
     }
 
     public function users(): BelongsToMany

@@ -1,17 +1,5 @@
 @extends(isset($manageJournal) ? 'layouts.journal-manage' : 'layouts.admin')
 
-@section('title', isset($manageJournal) ? 'Articles | '.$manageJournal->title : 'Articles | Admin')
-@section('page_title', 'Articles')
-@section('page_subtitle', isset($manageJournal) ? $manageJournal->title : 'Catalog articles across journals')
-
-@section('page_actions')
-    <a href="{{ isset($manageJournal) ? route('journal.manage.articles.create', $manageJournal) : $articlesCreateUrl }}" class="admin-btn admin-btn-primary">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v8M8 12h8"/></svg>
-        New article
-    </a>
-@endsection
-
-@section('content')
 @php
     $q = request('q');
     $journalId = isset($manageJournal) ? $manageJournal->id : request('journal_id');
@@ -23,15 +11,28 @@
     $articlesIndexParams = isset($manageJournal) ? [$manageJournal] : [];
     $articlesCreateUrl = isset($manageJournal)
         ? route('journal.manage.articles.create', $manageJournal)
-        : $articlesCreateUrl;
+        : route('admin.articles.create', array_filter(['journal_id' => request('journal_id')]));
     $articlesEdit = fn ($article) => isset($manageJournal)
         ? route('journal.manage.articles.edit', [$manageJournal, $article])
-        : $articlesEdit($article);
+        : route('admin.articles.edit', $article);
     $articlesIndexUrl = fn (array $query = []) => route(
         $articlesIndexRoute,
         array_merge($articlesIndexParams, array_filter($query, fn ($v) => $v !== null && $v !== ''))
     );
 @endphp
+
+@section('title', isset($manageJournal) ? 'Articles | '.$manageJournal->title : 'Articles | Admin')
+@section('page_title', 'Articles')
+@section('page_subtitle', isset($manageJournal) ? $manageJournal->title : 'Catalog articles across journals')
+
+@section('page_actions')
+    <a href="{{ $articlesCreateUrl }}" class="admin-btn admin-btn-primary">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v8M8 12h8"/></svg>
+        New article
+    </a>
+@endsection
+
+@section('content')
 
 <style>
     .aa-stats {
@@ -131,8 +132,8 @@
         background: #f8fafc; border-bottom: 1px solid var(--line);
     }
     .aa-table td {
-        padding: .85rem 1rem; border-bottom: 1px solid #f1f5f9;
-        vertical-align: top; font-size: .86rem;
+        padding: .75rem 1rem; border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle; font-size: .86rem;
     }
     .aa-table tr:last-child td { border-bottom: 0; }
     .aa-table tr:hover td { background: #fafbfc; }
@@ -154,7 +155,37 @@
     .aa-badge--closed { background: #f1f5f9; color: #64748b; }
     .aa-badge--published { background: #dcfce7; color: #15803d; }
     .aa-badge--draft { background: #f1f5f9; color: #64748b; }
-    .aa-row-actions { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: flex-end; }
+    .aa-table th.aa-table__actions,
+    .aa-table td.aa-table__actions {
+        width: 1%; white-space: nowrap; text-align: right;
+    }
+    .aa-action-group {
+        display: inline-flex; align-items: stretch;
+        border: 1px solid #dbeafe; border-radius: .6rem;
+        overflow: hidden; background: #fff;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04);
+    }
+    .aa-action {
+        display: inline-flex; align-items: center; justify-content: center; gap: .32rem;
+        padding: .42rem .68rem; border: 0; background: #fff;
+        color: #475569; font: inherit; font-size: .72rem; font-weight: 700;
+        line-height: 1; text-decoration: none; cursor: pointer;
+        transition: background .15s ease, color .15s ease;
+    }
+    .aa-action + .aa-action { border-left: 1px solid #e2e8f0; }
+    .aa-action svg { width: .82rem; height: .82rem; flex-shrink: 0; }
+    .aa-action:hover { background: #f8fafc; color: #1e293b; }
+    .aa-action--preview:hover { color: #1d4ed8; background: #eff6ff; }
+    .aa-action--edit {
+        background: #2563eb; color: #fff;
+    }
+    .aa-action--edit:hover {
+        background: #1d4ed8; color: #fff;
+    }
+    .aa-action--solo {
+        border: 1px solid #dbeafe; border-radius: .6rem;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04);
+    }
 
     .aa-cards { display: none; }
     @media (max-width: 860px) {
@@ -165,7 +196,10 @@
         background: #fff; border: 1px solid var(--line); border-radius: .95rem;
         padding: .9rem 1rem; box-shadow: 0 8px 24px rgba(15,23,42,.035);
     }
-    .aa-card__actions { display: flex; gap: .4rem; margin-top: .75rem; }
+    .aa-card__actions { display: flex; gap: .45rem; margin-top: .75rem; }
+    .aa-card__actions .aa-action-group,
+    .aa-card__actions .aa-action--solo { width: 100%; }
+    .aa-card__actions .aa-action { flex: 1; padding: .55rem .75rem; font-size: .78rem; }
 
     .aa-empty {
         background: #fff; border: 1px solid var(--line); border-radius: 1.05rem;
@@ -353,12 +387,15 @@
 
         <div class="aa-filters">
             @unless(isset($manageJournal))
-            <select class="aa-select" x-model="journalId" @change="onJournalChange()" aria-label="Journal">
-                <option value="">All journals</option>
-                @foreach($journals as $j)
-                    <option value="{{ $j->id }}">{{ $j->title }}</option>
-                @endforeach
-            </select>
+            <x-journal-picker
+                :journals="$journals"
+                name="_filter_journal"
+                :value="(string) ($journalId ?? '')"
+                allow-empty
+                empty-label="All journals"
+                class="aa-journal-filter"
+                @picker-change="journalId = $event.detail; onJournalChange()"
+            />
             @endunless
 
             <button type="button" class="aa-chip" :class="{ 'is-active': !status }" @click="setStatus(null)">All status</button>
@@ -395,7 +432,7 @@
                             <th>Journal</th>
                             <th>Access</th>
                             <th>Status</th>
-                            <th></th>
+                            <th class="aa-table__actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -431,13 +468,24 @@
                                 <td>
                                     <span class="aa-badge aa-badge--{{ $article->status }}">{{ $article->status }}</span>
                                 </td>
-                                <td>
-                                    <div class="aa-row-actions">
-                                        @if($article->journal)
-                                            <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" target="_blank" rel="noopener" class="admin-chip" style="padding:.4rem .65rem;font-size:.74rem">Preview</a>
-                                        @endif
-                                        <a href="{{ $articlesEdit($article) }}" class="admin-btn admin-btn-primary" style="padding:.4rem .65rem;font-size:.74rem">Edit</a>
-                                    </div>
+                                <td class="aa-table__actions">
+                                    @if($article->journal)
+                                        <div class="aa-action-group">
+                                            <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" target="_blank" rel="noopener" class="aa-action aa-action--preview" title="Preview on site">
+                                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                Preview
+                                            </a>
+                                            <a href="{{ $articlesEdit($article) }}" class="aa-action aa-action--edit" title="Edit article">
+                                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                Edit
+                                            </a>
+                                        </div>
+                                    @else
+                                        <a href="{{ $articlesEdit($article) }}" class="aa-action aa-action--edit aa-action--solo" title="Edit article">
+                                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                            Edit
+                                        </a>
+                                    @endif
                         </td>
                     </tr>
                         @endforeach
@@ -458,9 +506,22 @@
                         </div>
                         <div class="aa-card__actions">
                             @if($article->journal)
-                                <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" target="_blank" rel="noopener" class="admin-chip" style="flex:1;justify-content:center">Preview</a>
+                                <div class="aa-action-group">
+                                    <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" target="_blank" rel="noopener" class="aa-action aa-action--preview">
+                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        Preview
+                                    </a>
+                                    <a href="{{ $articlesEdit($article) }}" class="aa-action aa-action--edit">
+                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        Edit
+                                    </a>
+                                </div>
+                            @else
+                                <a href="{{ $articlesEdit($article) }}" class="aa-action aa-action--edit aa-action--solo">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    Edit
+                                </a>
                             @endif
-                            <a href="{{ $articlesEdit($article) }}" class="admin-btn admin-btn-primary" style="flex:1;justify-content:center">Edit</a>
                         </div>
                     </article>
                 @endforeach

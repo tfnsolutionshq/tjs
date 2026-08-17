@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -51,7 +52,26 @@ class ProfileController extends Controller
             $user->email_verified_at = null;
         }
 
+        if ($request->boolean('remove_avatar') && $user->avatar_path) {
+            Storage::disk('public')->delete($user->avatar_path);
+            $user->avatar_path = null;
+        }
+
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar_path) {
+                Storage::disk('public')->delete($user->avatar_path);
+            }
+
+            $user->avatar_path = $request->file('avatar')->store('avatars/'.$user->id, 'public');
+        }
+
         $user->save();
+
+        if ($user->wasChanged('email')) {
+            $user->sendEmailVerificationNotification();
+
+            return Redirect::route('verification.notice')->with('status', 'verification-otp-sent');
+        }
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
@@ -70,6 +90,10 @@ class ProfileController extends Controller
         $user = $request->user();
 
         Auth::logout();
+
+        if ($user->avatar_path) {
+            Storage::disk('public')->deleteDirectory('avatars/'.$user->id);
+        }
 
         $user->delete();
 

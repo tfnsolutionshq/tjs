@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Membership;
 use App\Models\MembershipPlan;
 use App\Models\Submission;
+use App\Services\Journal\ReviewerRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -59,11 +60,14 @@ class DashboardController extends Controller
             ->orderBy('price_amount')
             ->get();
 
+        $reviewerRequestJournals = app(ReviewerRequestService::class)->memberJournalContexts($user);
+
         return view('dashboard', compact(
             'stats',
             'recentSubmissions',
             'activeMemberships',
             'membershipPlans',
+            'reviewerRequestJournals',
         ));
     }
 }

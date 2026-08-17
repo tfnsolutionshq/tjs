@@ -52,6 +52,10 @@ class PaymentFulfillmentService
             throw new RuntimeException('This membership plan is inactive.');
         }
 
+        if (app(\App\Services\Membership\MembershipCoverageService::class)->planIsCovered($user, $plan)) {
+            throw new RuntimeException('You already have active membership that covers this plan.');
+        }
+
         return $this->startTransaction(
             $user,
             MembershipPlan::class,

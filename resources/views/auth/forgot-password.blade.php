@@ -8,7 +8,7 @@
         @csrf
 
         <div>
-            <label class="auth-label" for="email">Email</label>
+            <x-form-label class="auth-label" for="email" field="auth.email">Email</x-form-label>
             <input id="email" class="auth-input" type="email" name="email" value="{{ old('email') }}" required autofocus>
             <x-input-error :messages="$errors->get('email')" class="auth-error" />
         </div>

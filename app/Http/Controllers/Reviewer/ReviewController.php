@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Reviewer;
 use App\Http\Controllers\Controller;
 use App\Models\ReviewerAssignment;
 use App\Models\Submission;
+use App\Models\SubmissionRevision;
 use App\Models\SubmissionTimeline;
+use App\Support\ReviewType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReviewController extends Controller
 {
@@ -30,19 +34,64 @@ class ReviewController extends Controller
     {
         $this->assertAssigned($request, $submission);
 
-        $submission->load(['journal', 'author', 'assignments', 'timelines.user', 'revisions']);
+        $submission->load([
+            'journal',
+            'assignments.reviewer',
+            'timelines.user',
+            'revisions.uploader',
+            'issue.volume',
+            'announcement',
+        ]);
+
+        $reviewType = ReviewType::forSubmission($submission);
+        if (ReviewType::isOpen($reviewType)) {
+            $submission->load('author');
+        }
 
         $assignment = $submission->assignments
             ->where('reviewer_id', $request->user()->id)
             ->sortByDesc('id')
             ->first();
 
-        return view('reviewer.reviews.show', compact('submission', 'assignment'));
+        $canDecide = $assignment && in_array($assignment->status, ['assigned', 'in_progress'], true);
+
+        return view('reviewer.reviews.show', compact('submission', 'assignment', 'reviewType', 'canDecide'));
+    }
+
+    public function download(Request $request, Submission $submission): StreamedResponse
+    {
+        $this->assertAssigned($request, $submission);
+        abort_unless($submission->document_path && Storage::disk('local')->exists($submission->document_path), 404);
+
+        return Storage::disk('local')->download(
+            $submission->document_path,
+            basename($submission->document_path)
+        );
+    }
+
+    public function downloadRevision(Request $request, Submission $submission, SubmissionRevision $revision): StreamedResponse
+    {
+        $this->assertAssigned($request, $submission);
+        abort_unless((string) $revision->submission_id === (string) $submission->id, 404);
+        abort_unless($revision->document_path && Storage::disk('local')->exists($revision->document_path), 404);
+
+        return Storage::disk('local')->download(
+            $revision->document_path,
+            basename($revision->document_path)
+        );
     }
 
     public function decide(Request $request, Submission $submission): RedirectResponse
     {
         $this->assertAssigned($request, $submission);
+
+        $active = ReviewerAssignment::query()
+            ->where('submission_id', $submission->id)
+            ->where('reviewer_id', $request->user()->id)
+            ->whereIn('status', ['assigned', 'in_progress'])
+            ->exists();
+
+        abort_unless($active, 422, 'This assignment is not awaiting a decision.');
 
         $data = $request->validate([
             'decision' => ['required', 'in:accept,reject,revision_requested'],
@@ -81,6 +130,8 @@ class ReviewController extends Controller
                 'event' => 'review_decision',
                 'metadata' => [
                     'decision' => $data['decision'],
+                    'comment' => $data['comment'] ?? null,
+                    'rejection_reason' => $updates['rejection_reason'] ?? null,
                 ],
             ]);
         });

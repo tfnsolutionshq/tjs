@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Support\ReviewType;
+
 class Submission extends Model
 {
     use HasUuids;
@@ -16,8 +18,8 @@ class Submission extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'journal_id', 'author_id', 'title', 'abstract', 'category', 'keywords',
-        'document_path', 'status', 'reviewer_id', 'review_comment',
+        'journal_id', 'issue_id', 'announcement_id', 'author_id', 'title', 'abstract', 'category', 'keywords',
+        'document_path', 'status', 'review_type', 'reviewer_id', 'review_comment',
         'rejection_reason', 'reviewed_at',
     ];
 
@@ -29,6 +31,16 @@ class Submission extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class);
+    }
+
+    public function issue(): BelongsTo
+    {
+        return $this->belongsTo(Issue::class);
+    }
+
+    public function announcement(): BelongsTo
+    {
+        return $this->belongsTo(JournalAnnouncement::class, 'announcement_id');
     }
 
     public function author(): BelongsTo
@@ -64,5 +76,15 @@ class Submission extends Model
     public function article(): BelongsTo
     {
         return $this->belongsTo(Article::class, 'id', 'submission_id');
+    }
+
+    public function effectiveReviewType(): string
+    {
+        return ReviewType::forSubmission($this);
+    }
+
+    public function isOpenReview(): bool
+    {
+        return ReviewType::isOpen($this->effectiveReviewType());
     }
 }

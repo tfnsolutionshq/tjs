@@ -14,7 +14,7 @@
     @method('put')
 
     <div class="pf-field">
-        <label for="update_password_current_password">Current password</label>
+        <x-form-label for="update_password_current_password" field="user.current_password">Current password</x-form-label>
         <input id="update_password_current_password" name="current_password" type="password" class="pf-input" autocomplete="current-password" :readonly="submitting">
         @error('current_password', 'updatePassword')
             <p class="pf-error">{{ $message }}</p>
@@ -23,7 +23,7 @@
 
     <div class="pf-grid pf-grid--2">
         <div class="pf-field">
-            <label for="update_password_password">New password</label>
+            <x-form-label for="update_password_password" field="user.password">New password</x-form-label>
             <input id="update_password_password" name="password" type="password" class="pf-input" autocomplete="new-password" :readonly="submitting">
             @error('password', 'updatePassword')
                 <p class="pf-error">{{ $message }}</p>
@@ -31,7 +31,7 @@
         </div>
 
         <div class="pf-field">
-            <label for="update_password_password_confirmation">Confirm password</label>
+            <x-form-label for="update_password_password_confirmation" field="user.password_confirmation">Confirm password</x-form-label>
             <input id="update_password_password_confirmation" name="password_confirmation" type="password" class="pf-input" autocomplete="new-password" :readonly="submitting">
         </div>
     </div>

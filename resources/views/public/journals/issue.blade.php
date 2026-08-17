@@ -38,7 +38,7 @@
                 'issn' => $issue->volume?->issn ?: $journal->issn,
             ],
         ],
-        'hasPart' => $issue->articles->map(fn ($a) => [
+        'hasPart' => $schemaArticles->map(fn ($a) => [
             '@type' => 'ScholarlyArticle',
             'headline' => $a->title,
             'url' => route('journals.articles.show', [$journal, $a]),
@@ -104,7 +104,7 @@
             <div class="j-card mt-3 space-y-2 p-4 text-sm">
                 <p><span class="font-semibold">Volume</span> · {{ $issue->volume?->volume_number }} ({{ $issue->volume?->year }})</p>
                 <p><span class="font-semibold">Issue</span> · {{ $issue->issue_number }}</p>
-                <p><span class="font-semibold">Articles</span> · {{ $issue->articles->count() }}</p>
+                <p><span class="font-semibold">Articles</span> · {{ $articles->total() }}</p>
                 @if($journal->issn)<p><span class="font-semibold">ISSN</span> · {{ $journal->issn }}</p>@endif
             </div>
         </aside>
@@ -115,13 +115,17 @@
                 <p class="j-meta mt-2 text-base">{{ $issue->title }}</p>
             @endif
             <p class="j-meta mt-2">
-                {{ $issue->articles->count() }} article{{ $issue->articles->count() === 1 ? '' : 's' }} in this issue
+                {{ $articles->total() }} article{{ $articles->total() === 1 ? '' : 's' }} in this issue
             </p>
 
+            @if($articles->total() > 0)
+                @include('public.journals.partials.list-controls', ['paginator' => $articles, 'layout' => $layout])
+            @endif
+
             <div class="mt-7 space-y-3">
-                @forelse($issue->articles as $article)
+                @forelse($articles as $article)
                     <article class="j-card iss-item">
-                        <div class="iss-num" aria-hidden="true">{{ str_pad((string) ($loop->iteration), 2, '0', STR_PAD_LEFT) }}</div>
+                        <div class="iss-num" aria-hidden="true">{{ str_pad((string) ($articles->firstItem() + $loop->index), 2, '0', STR_PAD_LEFT) }}</div>
                         <div class="min-w-0">
                             <div class="flex flex-wrap gap-2">
                                 @foreach($article->categories as $cat)
@@ -165,6 +169,10 @@
                     <div class="j-card p-6 text-sm" style="color: var(--j-muted)">No articles in this issue yet.</div>
                 @endforelse
             </div>
+
+            @if($articles->hasPages())
+                {{ $articles->links('vendor.pagination.journal') }}
+            @endif
         </div>
     </div>
 </div>

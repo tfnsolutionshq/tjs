@@ -16,6 +16,8 @@
 @endsection
 
 @section('content')
+@include('public.journals.partials.page-styles')
+
 @php
     $year = request('year');
     $q = request('q');
@@ -91,6 +93,34 @@
         .jb-actions { flex-direction: column; align-items: stretch; min-width: 7.5rem; }
         .jb-actions .j-btn, .jb-actions .j-btn-ghost { justify-content: center; padding: .55rem .75rem; font-size: .8rem; }
     }
+    .jb-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: minmax(0, 1fr);
+    }
+    @media (min-width: 640px) {
+        .jb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+        .jb-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .jb-grid.is-list { grid-template-columns: minmax(0, 1fr); }
+    .jb-card {
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+        height: 100%;
+        padding: 1.1rem 1.15rem 1.15rem;
+    }
+    .jb-card__title {
+        font-family: var(--j-font-display);
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.35;
+        color: var(--j-text);
+    }
+    .jb-card__title a { color: inherit; text-decoration: none; }
+    .jb-card__title a:hover { color: var(--j-accent); }
 </style>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
@@ -137,6 +167,10 @@
         </div>
     @endif
 
+    @if($articles->total() > 0)
+        @include('public.journals.partials.list-controls', ['paginator' => $articles, 'layout' => $layout])
+    @endif
+
     @if($articles->isEmpty())
         <div class="j-card p-8 text-center">
             <p class="j-display text-lg font-semibold" style="color: var(--j-text)">No articles found</p>
@@ -152,6 +186,43 @@
             @endif
         </div>
     @else
+        @if(($layout ?? 'list') === 'grid')
+            <div @class(['jb-grid', 'is-list' => false])>
+                @foreach($articles as $article)
+                    <article class="j-card jb-card">
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($article->categories as $cat)
+                                <span class="j-badge">{{ $cat->name }}</span>
+                            @endforeach
+                            @if($article->categories->isEmpty() && $article->category)
+                                <span class="j-badge">{{ $article->category }}</span>
+                            @endif
+                        </div>
+                        <h3 class="jb-card__title">
+                            <a href="{{ route('journals.articles.show', [$journal, $article]) }}">{{ $article->title }}</a>
+                        </h3>
+                        <p class="j-meta">
+                            {{ $article->authors->pluck('name')->join(', ') ?: 'Author TBA' }}
+                            @if($article->published_at)
+                                <span aria-hidden="true"> · </span>
+                                <time datetime="{{ $article->published_at->toDateString() }}">{{ $article->published_at->format('M j, Y') }}</time>
+                            @endif
+                        </p>
+                        @if($article->abstract)
+                            <p class="text-sm leading-relaxed line-clamp-3" style="color: var(--j-muted)">
+                                {{ Str::limit(strip_tags($article->abstract), 160) }}
+                            </p>
+                        @endif
+                        <div class="mt-auto flex flex-wrap gap-2 pt-1">
+                            <a class="j-btn text-sm" href="{{ route('journals.articles.show', [$journal, $article]) }}">Read</a>
+                            @if($article->visibility === 'open')
+                                <a class="j-btn-ghost text-sm" href="{{ route('journals.articles.pdf', [$journal, $article->slug]) }}">PDF</a>
+                            @endif
+                        </div>
+                    </article>
+                @endforeach
+            </div>
+        @else
         @php $displayNum = $articles->firstItem() ?? 1; @endphp
         @foreach($grouped as $groupYear => $groupArticles)
             <section class="mb-8">
@@ -216,8 +287,10 @@
             </section>
         @endforeach
 
+        @endif
+
         @if($articles->hasPages())
-            <div class="mt-2">{{ $articles->links() }}</div>
+            {{ $articles->links('vendor.pagination.journal') }}
         @endif
     @endif
 </div>

@@ -35,13 +35,19 @@ class AppServiceProvider extends ServiceProvider
         View::composer('layouts.journal-manage', function ($view) {
             $journal = request()->route('journal');
             $pending = 0;
+            $pendingReviewerRequests = 0;
             if ($journal) {
                 $pending = Submission::query()
                     ->where('journal_id', $journal->id)
                     ->whereIn('status', ['submitted', 'under_review', 'resubmitted', 'revision_requested'])
                     ->count();
+                $pendingReviewerRequests = \App\Models\JournalReviewerRequest::query()
+                    ->where('journal_id', $journal->id)
+                    ->pending()
+                    ->count();
             }
             $view->with('journalPendingSubmissions', $pending);
+            $view->with('journalPendingReviewerRequests', $pendingReviewerRequests);
             if (! $view->offsetExists('journal') && $journal) {
                 $view->with('journal', $journal);
             }

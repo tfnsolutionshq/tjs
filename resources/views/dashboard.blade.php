@@ -113,4 +113,26 @@
         </div>
     </section>
 </div>
+
+@if(($reviewerRequestJournals ?? collect())->isNotEmpty())
+    <section class="mp-card" style="margin-top:1.15rem">
+        <div class="mp-card__head">
+            <div>
+                <h2 class="mp-card__title">Become a reviewer</h2>
+                <p class="mp-card__desc">Request to join the peer-review team for journals you belong to.</p>
+            </div>
+        </div>
+        <div class="mp-card__body" style="display:grid;gap:1rem">
+            @foreach($reviewerRequestJournals as $row)
+                <x-reviewer-request-panel
+                    :journal="$row['journal']"
+                    :can-request="$row['canRequest']"
+                    :reason="$row['reason']"
+                    :pending="$row['pending']"
+                    :latest="$row['latest']"
+                />
+            @endforeach
+        </div>
+    </section>
+@endif
 @endsection

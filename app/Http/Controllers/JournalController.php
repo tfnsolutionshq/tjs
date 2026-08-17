@@ -6,19 +6,24 @@ use App\Models\Article;
 use App\Models\Issue;
 use App\Models\Journal;
 use App\Models\User;
-use App\Services\Access\ArticleAccessResolver;
-use App\Services\Seo\ApaCitation;
-use App\Services\Seo\ScholarlyMeta;
+use App\Models\JournalAnnouncement;
+use App\Services\Journal\ReviewerRequestService;
+use App\Support\ListLayout;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class JournalController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $journals = Journal::query()->where('is_active', true)->orderBy('title')->get();
+        $layout = ListLayout::fromRequest($request);
+        $journals = Journal::query()
+            ->where('is_active', true)
+            ->orderBy('title')
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('public.journals.index', compact('journals'));
+        return view('public.journals.index', compact('journals', 'layout'));
     }
 
     public function show(Journal $journal): View
@@ -35,18 +40,27 @@ class JournalController extends Controller
         return view('public.journals.show', compact('journal', 'currentIssue'));
     }
 
-    public function archive(Journal $journal): View
+    public function archive(Request $request, Journal $journal): View
     {
         abort_unless($journal->is_active, 404);
 
-        $volumes = $journal->volumes()
+        $layout = ListLayout::fromRequest($request);
+
+        $volumeQuery = $journal->volumes()->where('status', 'published');
+        $volumeCount = (clone $volumeQuery)->count();
+        $issueCount = Issue::query()
             ->where('status', 'published')
+            ->whereHas('volume', fn ($q) => $q->where('journal_id', $journal->id)->where('status', 'published'))
+            ->count();
+
+        $volumes = (clone $volumeQuery)
             ->with(['issues' => fn ($q) => $q->where('status', 'published')->orderBy('issue_number')])
             ->orderByDesc('year')
             ->orderByDesc('volume_number')
-            ->get();
+            ->paginate(6)
+            ->withQueryString();
 
-        return view('public.journals.archive', compact('journal', 'volumes'));
+        return view('public.journals.archive', compact('journal', 'volumes', 'volumeCount', 'issueCount', 'layout'));
     }
 
     public function about(Journal $journal): View
@@ -56,17 +70,22 @@ class JournalController extends Controller
         return view('public.journals.about', compact('journal'));
     }
 
-    public function editorialBoard(Journal $journal): View
+    public function editorialBoard(Request $request, Journal $journal): View
     {
         abort_unless($journal->is_active, 404);
-        $members = $journal->editorialBoard;
 
-        return view('public.journals.editorial-board', compact('journal', 'members'));
+        $layout = ListLayout::fromRequest($request);
+        $members = $journal->editorialBoard()->paginate(12)->withQueryString();
+
+        return view('public.journals.editorial-board', compact('journal', 'members', 'layout'));
     }
 
-    public function reviewers(Journal $journal): View
+    public function reviewers(Request $request, Journal $journal): View
     {
         abort_unless($journal->is_active, 404);
+
+        $layout = ListLayout::fromRequest($request);
+
         $reviewers = User::query()
             ->where('is_public_reviewer', true)
             ->where(function ($q) use ($journal) {
@@ -74,14 +93,21 @@ class JournalController extends Controller
                     ->orWhereHas('journals', fn ($j) => $j->where('journals.id', $journal->id)->wherePivot('role', 'reviewer'));
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'position', 'affiliation', 'bio']);
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('public.journals.reviewers', compact('journal', 'reviewers'));
+        $reviewerRequest = auth()->check()
+            ? app(ReviewerRequestService::class)->contextFor(auth()->user(), $journal)
+            : null;
+
+        return view('public.journals.reviewers', compact('journal', 'reviewers', 'reviewerRequest', 'layout'));
     }
 
     public function browse(Request $request, Journal $journal): View
     {
         abort_unless($journal->is_active, 404);
+
+        $layout = ListLayout::fromRequest($request, ListLayout::LIST);
 
         $base = Article::query()
             ->publicCatalog()
@@ -118,17 +144,60 @@ class JournalController extends Controller
         $articles = $query->paginate(20)->withQueryString();
         $totalPublished = (clone $base)->count();
 
-        return view('public.journals.browse', compact('journal', 'articles', 'years', 'totalPublished'));
+        return view('public.journals.browse', compact('journal', 'articles', 'years', 'totalPublished', 'layout'));
     }
 
-    public function issue(Journal $journal, Issue $issue): View
+    public function issue(Request $request, Journal $journal, Issue $issue): View
     {
         abort_unless($journal->is_active, 404);
         abort_unless($issue->volume && (int) $issue->volume->journal_id === (int) $journal->id, 404);
         abort_unless($issue->isPublished() && $issue->volume->isPublished(), 404);
 
-        $issue->load(['volume.journal', 'articles' => fn ($q) => $q->publicCatalog()->with(['authors', 'categories'])]);
+        $layout = ListLayout::fromRequest($request, ListLayout::LIST);
 
-        return view('public.journals.issue', compact('journal', 'issue'));
+        $issue->load(['volume.journal']);
+
+        $articles = Article::query()
+            ->publicCatalog()
+            ->where('issue_id', $issue->id)
+            ->with(['authors', 'categories'])
+            ->orderByDesc('published_at')
+            ->paginate(12)
+            ->withQueryString();
+
+        $schemaArticles = Article::query()
+            ->publicCatalog()
+            ->where('issue_id', $issue->id)
+            ->orderByDesc('published_at')
+            ->get(['id', 'title', 'slug']);
+
+        return view('public.journals.issue', compact('journal', 'issue', 'articles', 'schemaArticles', 'layout'));
+    }
+
+    public function announcements(Request $request, Journal $journal): View
+    {
+        abort_unless($journal->is_active, 404);
+
+        $layout = ListLayout::fromRequest($request);
+
+        $announcements = $journal->announcements()
+            ->where('is_published', true)
+            ->with(['issue.volume'])
+            ->orderByDesc('opens_at')
+            ->orderByDesc('created_at')
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('public.journals.announcements', compact('journal', 'announcements', 'layout'));
+    }
+
+    public function announcement(Journal $journal, JournalAnnouncement $announcement): View
+    {
+        abort_unless($journal->is_active, 404);
+        abort_unless((int) $announcement->journal_id === (int) $journal->id && $announcement->is_published, 404);
+
+        $announcement->load(['issue.volume', 'journal']);
+
+        return view('public.journals.announcement', compact('journal', 'announcement'));
     }
 }

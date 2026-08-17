@@ -47,28 +47,28 @@
                 <h3 style="margin:0;font-size:.88rem;font-weight:800">Add board member</h3>
                 <div class="jf-grid jf-grid--2">
                     <div class="jf-field">
-                        <label for="board_name">Name</label>
+                        <x-form-label for="board_name" field="board.name" :required="true" reqClass="jf-req">Name</x-form-label>
                         <input id="board_name" name="name" type="text" class="jf-input" required value="{{ old('name') }}">
                         @error('name')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
-                        <label for="board_role">Role title</label>
+                        <x-form-label for="board_role" field="board.role">Role title</x-form-label>
                         <input id="board_role" name="role_title" type="text" class="jf-input" value="{{ old('role_title') }}" placeholder="Editor-in-Chief">
                     </div>
                     <div class="jf-field">
-                        <label for="board_affiliation">Affiliation</label>
+                        <x-form-label for="board_affiliation" field="board.affiliation">Affiliation</x-form-label>
                         <input id="board_affiliation" name="affiliation" type="text" class="jf-input" value="{{ old('affiliation') }}">
                     </div>
                     <div class="jf-field">
-                        <label for="board_email">Email</label>
+                        <x-form-label for="board_email" field="board.email">Email</x-form-label>
                         <input id="board_email" name="email" type="email" class="jf-input" value="{{ old('email') }}">
                     </div>
                     <div class="jf-field">
-                        <label for="board_orcid">ORCID</label>
+                        <x-form-label for="board_orcid" field="board.orcid">ORCID</x-form-label>
                         <input id="board_orcid" name="orcid" type="text" class="jf-input" value="{{ old('orcid') }}">
                     </div>
                     <div class="jf-field">
-                        <label for="board_sort">Sort order</label>
+                        <x-form-label for="board_sort" field="board.sort_order">Sort order</x-form-label>
                         <input id="board_sort" name="sort_order" type="number" min="0" class="jf-input" value="{{ old('sort_order', 0) }}">
                     </div>
                 </div>

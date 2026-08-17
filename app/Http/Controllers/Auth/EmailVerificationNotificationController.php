@@ -3,22 +3,20 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\Auth\EmailVerificationOtpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class EmailVerificationNotificationController extends Controller
 {
-    /**
-     * Send a new email verification notification.
-     */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, EmailVerificationOtpService $otp): RedirectResponse
     {
         if ($request->user()->hasVerifiedEmail()) {
             return redirect()->intended(route('dashboard', absolute: false));
         }
 
-        $request->user()->sendEmailVerificationNotification();
+        $otp->resend($request->user());
 
-        return back()->with('status', 'verification-link-sent');
+        return back()->with('status', 'verification-otp-sent');
     }
 }

@@ -96,17 +96,17 @@
 
                 <div class="us-grid us-grid--2">
                     <div class="us-field">
-                        <label for="name">Full name</label>
+                        <x-form-label for="name" field="user.name" :required="true">Full name</x-form-label>
                         <input id="name" name="name" type="text" class="us-input" value="{{ old('name', $user->name) }}" required>
                         @error('name')<p class="us-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="us-field">
-                        <label for="email">Email</label>
+                        <x-form-label for="email" field="user.email" :required="true">Email</x-form-label>
                         <input id="email" name="email" type="email" class="us-input" value="{{ old('email', $user->email) }}" required>
                         @error('email')<p class="us-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="us-field">
-                        <label for="role">Platform role</label>
+                        <x-form-label for="role" field="user.role">Platform role</x-form-label>
                         <select id="role" name="role" class="us-select">
                             <option value="admin" @selected(old('role', $user->role) === 'admin')>Platform admin</option>
                             <option value="member" @selected(old('role', $user->role) === 'member')>Member</option>
@@ -115,28 +115,28 @@
                         @error('role')<p class="us-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="us-field">
-                        <label for="position">Position</label>
+                        <x-form-label for="position" field="user.position">Position</x-form-label>
                         <input id="position" name="position" type="text" class="us-input" value="{{ old('position', $user->position) }}">
                     </div>
                     <div class="us-field">
-                        <label for="affiliation">Affiliation</label>
+                        <x-form-label for="affiliation" field="user.affiliation">Affiliation</x-form-label>
                         <input id="affiliation" name="affiliation" type="text" class="us-input" value="{{ old('affiliation', $user->affiliation) }}">
                     </div>
                     <div class="us-field">
-                        <label for="orcid">ORCID</label>
+                        <x-form-label for="orcid" field="user.orcid">ORCID</x-form-label>
                         <input id="orcid" name="orcid" type="text" class="us-input" value="{{ old('orcid', $user->orcid) }}">
                     </div>
                     <div class="us-field" style="grid-column:1 / -1">
-                        <label for="bio">Bio</label>
+                        <x-form-label for="bio" field="user.bio">Bio</x-form-label>
                         <textarea id="bio" name="bio" class="us-textarea">{{ old('bio', $user->bio) }}</textarea>
                     </div>
                 </div>
 
-                <label style="display:flex;align-items:center;gap:.55rem;font-size:.86rem;font-weight:600;color:var(--ink)">
+                <div style="display:flex;align-items:center;gap:.55rem;font-size:.86rem;font-weight:600;color:var(--ink)">
                     <input type="hidden" name="is_public_reviewer" value="0">
-                    <input type="checkbox" name="is_public_reviewer" value="1" @checked(old('is_public_reviewer', $user->is_public_reviewer))>
-                    List as public reviewer
-                </label>
+                    <input id="is_public_reviewer" type="checkbox" name="is_public_reviewer" value="1" @checked(old('is_public_reviewer', $user->is_public_reviewer))>
+                    <x-form-label for="is_public_reviewer" field="user.public_reviewer" style="display:inline;margin:0;font-size:inherit;font-weight:inherit">List as public reviewer</x-form-label>
+                </div>
 
                 <div>
                     <button type="submit" class="admin-btn admin-btn-primary">Save user</button>

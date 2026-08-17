@@ -35,7 +35,9 @@ class JournalTeamAdminController extends Controller
 
             $journal->assignTeamMember($user, $data['role']);
 
-            return back()->with('status', 'Journal team member created and assigned.');
+            $user->sendEmailVerificationNotification();
+
+            return back()->with('status', 'Journal team member created and assigned. A verification code was emailed to them.');
         }
 
         $data = $request->validate([

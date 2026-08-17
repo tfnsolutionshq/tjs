@@ -16,7 +16,9 @@ use App\Http\Controllers\Author\SubmissionController as AuthorSubmissionControll
 use App\Http\Controllers\CatalogCoverController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Member\ReviewerRequestController;
 use App\Http\Controllers\MembershipController;
+use App\Http\Controllers\JournalManage\AnnouncementController as JournalManageAnnouncementController;
 use App\Http\Controllers\JournalManage\ArticleController as JournalManageArticleController;
 use App\Http\Controllers\JournalManage\DashboardController as JournalManageDashboardController;
 use App\Http\Controllers\JournalManage\EditorialBoardController as JournalManageEditorialBoardController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\JournalManage\MembershipPlanController as JournalManage
 use App\Http\Controllers\JournalManage\SettingsController as JournalManageSettingsController;
 use App\Http\Controllers\JournalManage\SubmissionController as JournalManageSubmissionController;
 use App\Http\Controllers\JournalManage\VolumeController as JournalManageVolumeController;
+use App\Http\Controllers\JournalManage\ReviewerRequestController as JournalManageReviewerRequestController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
@@ -42,6 +45,8 @@ Route::get('/j/{journal}/about', [JournalController::class, 'about'])->name('jou
 Route::get('/j/{journal}/editorial-board', [JournalController::class, 'editorialBoard'])->name('journals.editorial-board');
 Route::get('/j/{journal}/reviewers', [JournalController::class, 'reviewers'])->name('journals.reviewers');
 Route::get('/j/{journal}/browse', [JournalController::class, 'browse'])->name('journals.browse');
+Route::get('/j/{journal}/announcements', [JournalController::class, 'announcements'])->name('journals.announcements');
+Route::get('/j/{journal}/announcements/{announcement}', [JournalController::class, 'announcement'])->name('journals.announcements.show');
 Route::get('/j/{journal}/issues/{issue}', [JournalController::class, 'issue'])->name('journals.issues.show');
 Route::get('/j/{journal}/volumes/{volume}/cover', [CatalogCoverController::class, 'volume'])->name('journals.volumes.cover');
 Route::get('/j/{journal}/issues/{issue}/cover', [CatalogCoverController::class, 'issue'])->name('journals.issues.cover');
@@ -55,8 +60,14 @@ Route::get('/j/{journal}/articles/{article}', [ArticleController::class, 'show']
 Route::post('/paystack/webhook', [PaymentController::class, 'webhook'])->name('payments.webhook');
 Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('payments.callback');
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::middleware(['auth', 'verified'])->group(function () {
+        Route::get('/dashboard', DashboardController::class)->name('dashboard');
+        Route::get('/journals/check-slug', [JournalAdminController::class, 'checkSlug'])->name('journals.check-slug');
+    Route::post('/j/{journal}/reviewer-request', [ReviewerRequestController::class, 'store'])
+        ->name('reviewer-requests.store');
+    Route::delete('/j/{journal}/reviewer-request', [ReviewerRequestController::class, 'destroy'])
+        ->name('reviewer-requests.destroy');
+
     Route::get('/memberships', [MembershipController::class, 'index'])->name('memberships.index');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -81,6 +92,8 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('reviewer')->name('reviewer.')->middleware('review.queue')->group(function () {
         Route::get('/reviews', [ReviewController::class, 'index'])->name('reviews.index');
         Route::get('/reviews/{submission}', [ReviewController::class, 'show'])->name('reviews.show');
+        Route::get('/reviews/{submission}/download', [ReviewController::class, 'download'])->name('reviews.download');
+        Route::get('/reviews/{submission}/revisions/{revision}/download', [ReviewController::class, 'downloadRevision'])->name('reviews.revisions.download');
         Route::post('/reviews/{submission}/decide', [ReviewController::class, 'decide'])->name('reviews.decide');
     });
 
@@ -137,6 +150,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/submissions', [SubmissionAdminController::class, 'index'])->name('submissions.index');
         Route::get('/submissions/{submission}', [SubmissionAdminController::class, 'show'])->name('submissions.show');
         Route::post('/submissions/{submission}/assign-reviewer', [SubmissionAdminController::class, 'assignReviewer'])->name('submissions.assign-reviewer');
+        Route::post('/submissions/{submission}/review-type', [SubmissionAdminController::class, 'updateReviewType'])->name('submissions.update-review-type');
         Route::post('/submissions/{submission}/publish', [SubmissionAdminController::class, 'publishToIssue'])->name('submissions.publish');
     });
 
@@ -145,6 +159,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/settings', [JournalManageSettingsController::class, 'edit'])->name('settings.edit');
         Route::put('/settings', [JournalManageSettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/categories', [JournalManageSettingsController::class, 'storeCategory'])->name('settings.categories.store');
+        Route::put('/settings/categories/{category}', [JournalManageSettingsController::class, 'updateCategory'])->name('settings.categories.update');
+        Route::delete('/settings/categories/{category}', [JournalManageSettingsController::class, 'destroyCategory'])->name('settings.categories.destroy');
 
         Route::post('/editorial-board', [JournalManageEditorialBoardController::class, 'store'])->name('editorial-board.store');
         Route::delete('/editorial-board/{member}', [JournalManageEditorialBoardController::class, 'destroy'])->name('editorial-board.destroy');
@@ -168,7 +185,20 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/submissions', [JournalManageSubmissionController::class, 'index'])->name('submissions.index');
         Route::get('/submissions/{submission}', [JournalManageSubmissionController::class, 'show'])->name('submissions.show');
         Route::post('/submissions/{submission}/assign-reviewer', [JournalManageSubmissionController::class, 'assignReviewer'])->name('submissions.assign-reviewer');
+        Route::post('/submissions/{submission}/review-type', [JournalManageSubmissionController::class, 'updateReviewType'])->name('submissions.update-review-type');
         Route::post('/submissions/{submission}/publish', [JournalManageSubmissionController::class, 'publishToIssue'])->name('submissions.publish');
+
+        Route::get('/announcements', [JournalManageAnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('/announcements/create', [JournalManageAnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('/announcements', [JournalManageAnnouncementController::class, 'store'])->name('announcements.store');
+        Route::get('/announcements/{announcement}/edit', [JournalManageAnnouncementController::class, 'edit'])->name('announcements.edit');
+        Route::put('/announcements/{announcement}', [JournalManageAnnouncementController::class, 'update'])->name('announcements.update');
+        Route::post('/announcements/{announcement}/close', [JournalManageAnnouncementController::class, 'close'])->name('announcements.close');
+        Route::delete('/announcements/{announcement}', [JournalManageAnnouncementController::class, 'destroy'])->name('announcements.destroy');
+
+        Route::get('/reviewer-requests', [JournalManageReviewerRequestController::class, 'index'])->name('reviewer-requests.index');
+        Route::post('/reviewer-requests/{reviewerRequest}/approve', [JournalManageReviewerRequestController::class, 'approve'])->name('reviewer-requests.approve');
+        Route::post('/reviewer-requests/{reviewerRequest}/reject', [JournalManageReviewerRequestController::class, 'reject'])->name('reviewer-requests.reject');
 
         Route::get('/membership-plans', [JournalManageMembershipPlanController::class, 'index'])->name('membership-plans.index');
         Route::post('/membership-plans', [JournalManageMembershipPlanController::class, 'store'])->name('membership-plans.store');

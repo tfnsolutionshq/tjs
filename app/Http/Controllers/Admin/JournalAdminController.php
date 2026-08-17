@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Journal;
 use App\Models\User;
+use App\Services\Journal\CategoryService;
 use App\Support\JournalTheme;
 use App\Support\JournalTeamRoles;
 use App\Support\Licenses;
+use App\Support\ReviewType;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -69,6 +73,49 @@ class JournalAdminController extends Controller
         ]);
     }
 
+    public function checkSlug(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'slug' => ['required', 'string', 'max:255', 'alpha_dash'],
+            'except' => ['nullable', 'integer', 'exists:journals,id'],
+        ]);
+
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $exceptId = $data['except'] ?? null;
+
+        if ($exceptId) {
+            $journal = Journal::query()->findOrFail($exceptId);
+            abort_unless($journal->userMayMutate($user), 403);
+        } else {
+            abort_unless($user->canAccessPlatformAdmin(), 403);
+        }
+
+        $slug = Str::slug($data['slug']);
+
+        if ($slug === '') {
+            return response()->json([
+                'available' => false,
+                'slug' => '',
+                'message' => 'Enter a valid slug using letters, numbers, and dashes.',
+            ]);
+        }
+
+        $taken = Journal::query()
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
+            ->where('slug', $slug)
+            ->exists();
+
+        return response()->json([
+            'available' => ! $taken,
+            'slug' => $slug,
+            'message' => $taken
+                ? 'This slug is already used by another journal. Choose a different one.'
+                : 'This slug is available.',
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
@@ -81,6 +128,7 @@ class JournalAdminController extends Controller
         $journal = Journal::query()->create($data);
         $this->storeBrandAssets($request, $journal);
         $this->assignInitialAdmin($journal, $team);
+        app(CategoryService::class)->seedDefaults($journal);
 
         return redirect()
             ->route('admin.journals.edit', $journal)
@@ -131,6 +179,8 @@ class JournalAdminController extends Controller
             $data['allow_platform_admin_edits'] = $request->boolean('allow_platform_admin_edits');
         }
 
+        unset($data['slug']);
+
         $journal->update($data);
         $this->storeBrandAssets($request, $journal);
     }
@@ -167,15 +217,20 @@ class JournalAdminController extends Controller
      */
     private function validated(Request $request, ?Journal $journal = null): array
     {
-        return $request->validate([
+        if ($request->filled('slug')) {
+            $request->merge(['slug' => Str::slug($request->string('slug')->trim())]);
+        }
+
+        if ($request->filled('initials')) {
+            $clean = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $request->string('initials')->trim()) ?? '');
+            $request->merge(['initials' => $clean !== '' ? $clean : null]);
+        } else {
+            $request->merge(['initials' => null]);
+        }
+
+        $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'slug' => [
-                'required',
-                'string',
-                'max:255',
-                'alpha_dash',
-                Rule::unique('journals', 'slug')->ignore($journal?->id),
-            ],
+            'initials' => ['nullable', 'string', 'max:8', 'regex:/^[A-Z0-9]+$/'],
             'subtitle' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'issn' => ['nullable', 'string', 'max:32'],
@@ -183,6 +238,7 @@ class JournalAdminController extends Controller
             'publisher' => ['nullable', 'string', 'max:255'],
             'default_license' => ['nullable', 'string', Licenses::rule()],
             'language' => ['nullable', 'string', 'max:16'],
+            'review_type' => ReviewType::requiredRule(),
             'membership_price' => ['nullable', 'integer', 'min:0'],
             'membership_days' => ['nullable', 'integer', 'min:1'],
             'cover_path' => ['nullable', 'string', 'max:255'],
@@ -205,7 +261,34 @@ class JournalAdminController extends Controller
             'header_image' => ['nullable', 'image', 'max:15360'],
             'remove_logo' => ['nullable', 'boolean'],
             'remove_header_image' => ['nullable', 'boolean'],
+        ], [
+            'initials.max' => 'Initials may be at most 8 characters.',
+            'initials.regex' => 'Use only letters and numbers in the initials.',
         ]);
+
+        if ($journal === null) {
+            $slugRules = [
+                'slug' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    'alpha_dash',
+                    Rule::unique('journals', 'slug'),
+                ],
+            ];
+
+            $data = array_merge($data, $request->validate($slugRules, [
+                'slug.unique' => 'This slug is already used by another journal. Choose a different one.',
+                'slug.alpha_dash' => 'Use only letters, numbers, and dashes in the slug.',
+                'slug.required' => 'A URL slug is required.',
+            ]));
+        }
+
+        if (($data['initials'] ?? null) === '') {
+            $data['initials'] = null;
+        }
+
+        return $data;
     }
 
     private function themeFromRequest(Request $request): array
@@ -299,6 +382,7 @@ class JournalAdminController extends Controller
                 'password' => Hash::make($team['admin_password']),
                 'role' => 'member',
             ]);
+            $user->sendEmailVerificationNotification();
         } else {
             $user = User::query()->where('email', $team['admin_email'])->first();
             if (! $user) {

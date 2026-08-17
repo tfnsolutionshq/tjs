@@ -11,7 +11,7 @@
         : route('admin.submissions.index', array_filter($query, fn ($v) => $v !== null && $v !== ''));
     $submissionShowUrl = fn ($submission) => isset($manageJournal)
         ? route('journal.manage.submissions.show', [$manageJournal, $submission])
-        : $submissionShowUrl($submission);
+        : route('admin.submissions.show', $submission);
     $statusLabels = [
         'submitted' => 'Submitted',
         'under_review' => 'Under review',
@@ -325,12 +325,14 @@
 
         <div class="asub-filters">
             @unless(isset($manageJournal))
-            <select class="asub-select" x-model="journalId" @change="onJournalChange()">
-                <option value="">All journals</option>
-                @foreach($journals as $journal)
-                    <option value="{{ $journal->id }}">{{ $journal->title }}</option>
-                @endforeach
-            </select>
+            <x-journal-picker
+                :journals="$journals"
+                name="_filter_journal"
+                :value="(string) ($journalId ?? '')"
+                allow-empty
+                empty-label="All journals"
+                @picker-change="journalId = $event.detail; onJournalChange()"
+            />
             @endunless
 
             <select class="asub-select" x-model="status" @change="setStatus(status || null)">

@@ -115,6 +115,23 @@
         }
         .admin-nav a.is-active .admin-nav__badge { background: rgba(255,255,255,.22); }
 
+        .admin-sidebar-select {
+            width: 100%;
+            border: 1px solid rgba(255,255,255,.18);
+            background-color: rgba(11,18,32,.92);
+            color: #fff;
+            border-radius: .65rem;
+            padding: .5rem .65rem;
+            font: inherit;
+            font-size: .78rem;
+            font-weight: 600;
+        }
+        .admin-sidebar-select option,
+        .admin-sidebar-select optgroup {
+            background-color: #0b1220;
+            color: #fff;
+        }
+
         .admin-nav__footer { padding: .75rem .7rem 1rem; border-top: 1px solid rgba(255,255,255,.07); }
         .admin-user {
             display: flex; align-items: center; gap: .65rem;
@@ -126,6 +143,7 @@
             display: inline-flex; align-items: center; justify-content: center;
             background: var(--blue-strong); color: #fff;
             font-size: .75rem; font-weight: 800;
+            overflow: hidden; flex-shrink: 0;
         }
         .admin-user__name { font-size: .84rem; font-weight: 700; color: #fff; line-height: 1.15; }
         .admin-user__role { font-size: .7rem; color: rgba(255,255,255,.42); text-transform: capitalize; }
@@ -523,7 +541,7 @@
                         <label for="admin-jm-enter" style="display:block;margin:0 0 .35rem;font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.34)">Enter journal</label>
                         <select
                             id="admin-jm-enter"
-                            style="width:100%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;border-radius:.65rem;padding:.5rem .65rem;font:inherit;font-size:.78rem;font-weight:600"
+                            class="admin-sidebar-select"
                             onchange="if(this.value) window.location.href=this.value"
                         >
                             <option value="">Select journal…</option>
@@ -581,7 +599,13 @@
 
             <div class="admin-nav__footer">
                 <div class="admin-user">
-                    <span class="admin-user__avatar">{{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}</span>
+                    <span class="admin-user__avatar">
+                        @if(auth()->user()?->avatarUrl())
+                            <img src="{{ auth()->user()->avatarUrl() }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px;display:block">
+                        @else
+                            {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
+                        @endif
+                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="admin-user__name truncate">{{ auth()->user()->name }}</p>
                         <p class="admin-user__role">Platform admin</p>

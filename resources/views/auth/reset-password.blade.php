@@ -9,13 +9,13 @@
         <input type="hidden" name="token" value="{{ $request->route('token') }}">
 
         <div>
-            <label class="auth-label" for="email">Email</label>
+            <x-form-label class="auth-label" for="email" field="auth.email">Email</x-form-label>
             <input id="email" class="auth-input" type="email" name="email" value="{{ old('email', $request->email) }}" required autofocus autocomplete="username">
             <x-input-error :messages="$errors->get('email')" class="auth-error" />
         </div>
 
         <div>
-            <label class="auth-label" for="password">Password</label>
+            <x-form-label class="auth-label" for="password" field="auth.password">Password</x-form-label>
             <input id="password" class="auth-input" type="password" name="password" required autocomplete="new-password">
             <x-input-error :messages="$errors->get('password')" class="auth-error" />
         </div>

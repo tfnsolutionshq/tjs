@@ -7,7 +7,7 @@
     <form method="POST" action="{{ route('password.confirm') }}" class="space-y-4">
         @csrf
         <div>
-            <label class="auth-label" for="password">Password</label>
+            <x-form-label class="auth-label" for="password" field="user.current_password">Password</x-form-label>
             <input id="password" class="auth-input" type="password" name="password" required autocomplete="current-password">
             <x-input-error :messages="$errors->get('password')" class="auth-error" />
         </div>

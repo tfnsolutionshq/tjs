@@ -212,6 +212,137 @@
     .tjs-feature:hover h3 {
         color: #2f7de1;
     }
+
+    .tjs-label-row {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        max-width: 100%;
+    }
+
+    .tjs-label-row__text {
+        min-width: 0;
+    }
+
+    .tjs-req {
+        color: #dc2626;
+        font-weight: 800;
+        margin-left: 0.05rem;
+    }
+
+    .tjs-field-helper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .tjs-field-helper__btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.05rem;
+        height: 1.05rem;
+        padding: 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #64748b;
+        font: inherit;
+        font-size: 0.62rem;
+        font-weight: 800;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .tjs-field-helper__btn:hover,
+    .tjs-field-helper__btn[aria-expanded="true"] {
+        background: #eff6ff;
+        border-color: #93c5fd;
+        color: #1d4ed8;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+
+    .tjs-field-helper__pop {
+        position: absolute;
+        z-index: 120;
+        left: 0;
+        top: calc(100% + 0.4rem);
+        width: max(14rem, 18vw);
+        max-width: min(18rem, calc(100vw - 2rem));
+        padding: 0.65rem 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.65rem;
+        background: #fff;
+        color: #334155;
+        font-size: 0.76rem;
+        font-weight: 500;
+        line-height: 1.45;
+        box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+        text-align: left;
+    }
+
+    .tjs-field-helper__pop-enter {
+        transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .tjs-field-helper__pop-enter-start {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+
+    .tjs-field-helper__pop-enter-end {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .tjs-password-input {
+        position: relative;
+        display: block;
+        width: 100%;
+    }
+
+    .tjs-password-input__field {
+        padding-right: 2.75rem !important;
+    }
+
+    .tjs-password-input__toggle {
+        position: absolute;
+        top: 50%;
+        right: 0.45rem;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        border: 0;
+        border-radius: 0.45rem;
+        background: transparent;
+        color: #94a3b8;
+        cursor: pointer;
+        transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .tjs-password-input__toggle:hover {
+        color: #475569;
+        background: rgba(15, 23, 42, 0.05);
+    }
+
+    .tjs-password-input__toggle:focus {
+        outline: none;
+        color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+    }
+
+    .tjs-password-input__icon {
+        width: 1.1rem;
+        height: 1.1rem;
+        flex-shrink: 0;
+    }
 }
 
 @keyframes tjs-alert-progress {

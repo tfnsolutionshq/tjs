@@ -11,6 +11,7 @@ use App\Models\Submission;
 use App\Models\SubmissionTimeline;
 use App\Models\User;
 use App\Support\Licenses;
+use App\Support\ReviewType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,8 @@ class SubmissionAdminController extends Controller
     {
         $submission->load([
             'journal',
+            'issue.volume',
+            'announcement',
             'author',
             'reviewer',
             'assignments.reviewer',
@@ -119,6 +122,37 @@ class SubmissionAdminController extends Controller
             ->get();
 
         return view('admin.submissions.show', compact('submission', 'reviewers', 'issues'));
+    }
+
+    public function updateReviewType(Request $request, Submission $submission): RedirectResponse
+    {
+        $data = $request->validate([
+            'review_type' => ReviewType::requiredRule(),
+        ]);
+
+        $submission->update([
+            'review_type' => $data['review_type'],
+        ]);
+
+        SubmissionTimeline::query()->create([
+            'submission_id' => $submission->id,
+            'user_id' => $request->user()?->id,
+            'event' => 'review_type_updated',
+            'metadata' => [
+                'review_type' => $data['review_type'],
+            ],
+        ]);
+
+        $manageJournal = $request->attributes->get('manage_journal');
+        if ($manageJournal instanceof Journal) {
+            return redirect()
+                ->route('journal.manage.submissions.show', [$manageJournal, $submission])
+                ->with('status', 'Review type updated.');
+        }
+
+        return redirect()
+            ->route('admin.submissions.show', $submission)
+            ->with('status', 'Review type updated.');
     }
 
     public function assignReviewer(Request $request, Submission $submission): RedirectResponse
@@ -172,7 +206,7 @@ class SubmissionAdminController extends Controller
         $data = $request->validate([
             'issue_id' => ['required', 'exists:issues,id'],
             'slug' => ['nullable', 'string', 'max:255', 'alpha_dash'],
-            'doi' => ['nullable', 'string', 'max:255'],
+            'doi' => ['nullable', 'string', 'max:255', \App\Support\Doi::uniqueRule()],
             'license' => ['nullable', 'string', Licenses::rule()],
             'page_range' => ['nullable', 'string', 'max:64'],
             'visibility' => ['nullable', 'in:open,members_only,paid,closed'],
@@ -180,8 +214,13 @@ class SubmissionAdminController extends Controller
             'author_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $data['doi'] = \App\Support\Doi::normalize($data['doi'] ?? null);
+
         $issue = Issue::query()->with('volume')->findOrFail($data['issue_id']);
         abort_unless((int) $issue->volume?->journal_id === (int) $submission->journal_id, 422, 'Issue must belong to the submission journal.');
+        if ($submission->issue_id) {
+            abort_unless((int) $issue->id === (int) $submission->issue_id, 422, 'Approved submissions must be published to their target issue.');
+        }
 
         $article = DB::transaction(function () use ($submission, $issue, $data) {
             $slugBase = $data['slug'] ?? Str::slug($submission->title);
@@ -199,7 +238,7 @@ class SubmissionAdminController extends Controller
                     'abstract' => $submission->abstract,
                     'category' => $submission->category,
                     'keywords' => $submission->keywords,
-                    'doi' => $data['doi'] ?? null,
+                    'doi' => $data['doi'],
                     'license' => ! empty($data['license']) ? Licenses::normalize($data['license']) : null,
                     'page_range' => $data['page_range'] ?? null,
                     'visibility' => $data['visibility'] ?? 'open',

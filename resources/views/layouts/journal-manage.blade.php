@@ -115,6 +115,23 @@
         }
         .admin-nav a.is-active .admin-nav__badge { background: rgba(255,255,255,.22); }
 
+        .admin-sidebar-select {
+            width: 100%;
+            border: 1px solid rgba(255,255,255,.18);
+            background-color: rgba(11,18,32,.92);
+            color: #fff;
+            border-radius: .65rem;
+            padding: .5rem .65rem;
+            font: inherit;
+            font-size: .8rem;
+            font-weight: 600;
+        }
+        .admin-sidebar-select option,
+        .admin-sidebar-select optgroup {
+            background-color: #0b1220;
+            color: #fff;
+        }
+
         .admin-nav__footer { padding: .75rem .7rem 1rem; border-top: 1px solid rgba(255,255,255,.07); }
         .admin-user {
             display: flex; align-items: center; gap: .65rem;
@@ -126,6 +143,7 @@
             display: inline-flex; align-items: center; justify-content: center;
             background: var(--blue-strong); color: #fff;
             font-size: .75rem; font-weight: 800;
+            overflow: hidden; flex-shrink: 0;
         }
         .admin-user__name { font-size: .84rem; font-weight: 700; color: #fff; line-height: 1.15; }
         .admin-user__role { font-size: .7rem; color: rgba(255,255,255,.42); text-transform: capitalize; }
@@ -524,13 +542,15 @@
                     <div style="border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);border-radius:.85rem;padding:.7rem .75rem">
                         <p style="margin:0;font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)">Working in</p>
                         <p style="margin:.3rem 0 0;font-size:.88rem;font-weight:750;color:#fff;line-height:1.3">{{ $jmJournal->title }}</p>
-                        <p style="margin:.25rem 0 0;font-size:.72rem;color:rgba(255,255,255,.55)">{{ $jmRoleLabel }}@if($isPlatformAdminHere) · platform admin@endif</p>
+                        <p style="margin:.25rem 0 0;font-size:.72rem;color:rgba(255,255,255,.55)">
+                            {{ $jmRoleLabel }}@if($isPlatformAdminHere) · platform admin @endif
+                        </p>
 
                         @if($jmManaged->count() > 1)
                             <label for="jm-switch" style="display:block;margin:.7rem 0 .3rem;font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)">Switch journal</label>
                             <select
                                 id="jm-switch"
-                                style="width:100%;border:1px solid rgba(255,255,255,.14);background:rgba(11,18,32,.55);color:#fff;border-radius:.6rem;padding:.5rem .65rem;font:inherit;font-size:.8rem;font-weight:600"
+                                class="admin-sidebar-select"
                                 onchange="if(this.value) window.location.href=this.value"
                             >
                                 @foreach($jmManaged as $managed)
@@ -571,6 +591,17 @@
                             <span class="admin-nav__badge">{{ $journalPendingSubmissions > 99 ? '99+' : $journalPendingSubmissions }}</span>
                         @endif
                     </a>
+                    <a href="{{ route('journal.manage.announcements.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.announcements.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" d="M12 7.5v9M7.5 12h9"/><path d="M6.5 4.5h11A2 2 0 0119.5 6.5v11a2 2 0 01-2 2h-11a2 2 0 01-2-2v-11a2 2 0 012-2z"/></svg>
+                        Announcements
+                    </a>
+                    <a href="{{ route('journal.manage.reviewer-requests.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.reviewer-requests.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+                        Reviewer requests
+                        @if(($journalPendingReviewerRequests ?? 0) > 0)
+                            <span class="admin-nav__badge">{{ $journalPendingReviewerRequests > 99 ? '99+' : $journalPendingReviewerRequests }}</span>
+                        @endif
+                    </a>
 
                     <p class="admin-nav__label">Access</p>
                     <a href="{{ route('journal.manage.membership-plans.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.membership-plans.*')]) @click="sidebarOpen = false">
@@ -609,7 +640,13 @@
 
             <div class="admin-nav__footer">
                 <div class="admin-user">
-                    <span class="admin-user__avatar">{{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}</span>
+                    <span class="admin-user__avatar">
+                        @if(auth()->user()?->avatarUrl())
+                            <img src="{{ auth()->user()->avatarUrl() }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px;display:block">
+                        @else
+                            {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
+                        @endif
+                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="admin-user__name truncate">{{ auth()->user()->name }}</p>
                         <p class="admin-user__role">{{ $jmRoleLabel }}</p>

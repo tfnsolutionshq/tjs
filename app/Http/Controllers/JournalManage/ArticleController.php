@@ -84,7 +84,12 @@ class ArticleController extends Controller
     {
         $journals = collect([$journal]);
         $catalog = $this->placementCatalogForJournal($journal);
-        $categories = Category::query()->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug']);
+        $categories = Category::query()
+            ->active()
+            ->forJournal($journal)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'journal_id']);
         $ocrAvailable = $this->extractor->tesseractAvailable();
         $manageJournal = $journal;
 
@@ -148,6 +153,8 @@ class ArticleController extends Controller
 
     public function quickCategory(Request $request, Journal $journal): JsonResponse
     {
+        $request->merge(['journal_id' => $journal->id]);
+
         return $this->platform->quickCategory($request);
     }
 

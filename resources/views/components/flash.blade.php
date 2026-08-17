@@ -4,9 +4,13 @@
             <x-alert type="success">{{ session('success') }}</x-alert>
         @endif
         @if (session('status'))
-            @if (session('status') === 'verification-link-sent')
+            @if (session('status') === 'verification-otp-sent')
                 <x-alert type="success" title="Email sent">
-                    A new verification link has been sent to your email address.
+                    A new verification code has been sent to your email address.
+                </x-alert>
+            @elseif (session('status') === 'verification-link-sent')
+                <x-alert type="success" title="Email sent">
+                    A new verification code has been sent to your email address.
                 </x-alert>
             @else
                 <x-alert type="success">{{ session('status') }}</x-alert>

@@ -13,6 +13,7 @@ use App\Models\Volume;
 use App\Services\Articles\ArticleDocumentExtractor;
 use App\Services\Storage\ArticleStorage;
 use App\Support\Licenses;
+use App\Support\Nationalities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -86,7 +87,7 @@ class ArticleAdminController extends Controller
     {
         $journals = Journal::query()->orderBy('title')->get();
         $catalog = $this->placementCatalog();
-        $categories = Category::query()->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug']);
+        $categories = Category::query()->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug', 'journal_id']);
         $ocrAvailable = $this->extractor->tesseractAvailable();
 
         return view('admin.articles.create', compact('journals', 'catalog', 'categories', 'ocrAvailable'));
@@ -194,6 +195,7 @@ class ArticleAdminController extends Controller
     public function quickCategory(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'journal_id' => ['required', 'exists:journals,id'],
             'name' => ['required', 'string', 'max:120'],
         ]);
 
@@ -203,20 +205,26 @@ class ArticleAdminController extends Controller
             return response()->json(['message' => 'Enter a valid category name.'], 422);
         }
 
-        $existing = Category::query()->where('slug', $slug)->orWhere('name', $name)->first();
+        $existing = Category::query()
+            ->forJournal((int) $data['journal_id'])
+            ->where(fn ($q) => $q->where('slug', $slug)->orWhere('name', $name))
+            ->first();
+
         if ($existing) {
             return response()->json([
                 'category' => [
                     'id' => $existing->id,
                     'name' => $existing->name,
                     'slug' => $existing->slug,
+                    'journal_id' => $existing->journal_id,
                 ],
                 'created' => false,
             ]);
         }
 
-        $maxSort = (int) Category::query()->max('sort_order');
+        $maxSort = (int) Category::query()->forJournal((int) $data['journal_id'])->max('sort_order');
         $category = Category::query()->create([
+            'journal_id' => (int) $data['journal_id'],
             'name' => $name,
             'slug' => $slug,
             'is_active' => true,
@@ -228,6 +236,7 @@ class ArticleAdminController extends Controller
                 'id' => $category->id,
                 'name' => $category->name,
                 'slug' => $category->slug,
+                'journal_id' => $category->journal_id,
             ],
             'created' => true,
         ], 201);
@@ -286,7 +295,12 @@ class ArticleAdminController extends Controller
         $article->load(['authors', 'journal', 'issue.volume', 'categories']);
         $journals = Journal::query()->orderBy('title')->get();
         $catalog = $this->placementCatalog();
-        $categories = Category::query()->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug']);
+        $categories = Category::query()
+            ->active()
+            ->forJournal((int) $article->journal_id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'journal_id']);
 
         $authorsPayload = $this->authorsForForm($article);
 
@@ -405,7 +419,7 @@ class ArticleAdminController extends Controller
      */
     private function validated(Request $request, ?Article $article = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'journal_id' => ['required', 'exists:journals,id'],
             'issue_id' => ['nullable', 'exists:issues,id'],
             'author_user_id' => ['nullable', 'exists:users,id'],
@@ -421,9 +435,12 @@ class ArticleAdminController extends Controller
             ],
             'abstract' => ['nullable', 'string'],
             'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['integer', 'exists:categories,id'],
+            'category_ids.*' => [
+                'integer',
+                Rule::exists('categories', 'id')->where(fn ($q) => $q->where('journal_id', $request->integer('journal_id'))),
+            ],
             'keywords' => ['nullable', 'string', 'max:500'],
-            'doi' => ['nullable', 'string', 'max:255'],
+            'doi' => ['nullable', 'string', 'max:255', \App\Support\Doi::uniqueRule($article?->id)],
             'license' => ['nullable', 'string', Licenses::rule()],
             'page_range' => ['nullable', 'string', 'max:64'],
             'visibility' => ['required', 'in:open,members_only,paid,closed'],
@@ -437,13 +454,17 @@ class ArticleAdminController extends Controller
             'authors.*.middle_name' => ['nullable', 'string', 'max:255'],
             'authors.*.email' => ['nullable', 'email', 'max:255'],
             'authors.*.affiliation' => ['nullable', 'string', 'max:500'],
-            'authors.*.nationality' => ['nullable', 'string', 'max:255'],
+            'authors.*.nationality' => ['nullable', 'string', 'max:255', Rule::in(Nationalities::names())],
             'authors.*.orcid' => ['nullable', 'string', 'max:64'],
             'authors.*.role' => ['nullable', 'string', 'in:author,co-author,lead-author,editor,contributor,translator'],
             'authors.*.is_corresponding' => ['nullable', 'boolean'],
             'galley' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
             'references' => ['nullable', 'array'],
         ]);
+
+        $data['doi'] = \App\Support\Doi::normalize($data['doi'] ?? null);
+
+        return $data;
     }
 
     private function uniqueSlug(int $journalId, string $slug, ?string $ignoreId = null): string
@@ -509,7 +530,7 @@ class ArticleAdminController extends Controller
             foreach ([
                 'email' => $a->email,
                 'affiliation' => $a->affiliation,
-                'nationality' => $a->nationality,
+                'nationality' => Nationalities::normalize($a->nationality),
                 'orcid' => $a->orcid,
                 'role' => $this->normalizeAuthorRole($a->role),
             ] as $key => $value) {
@@ -618,7 +639,7 @@ class ArticleAdminController extends Controller
 
             $email = trim((string) ($row['email'] ?? ''));
             $affiliation = trim((string) ($row['affiliation'] ?? ''));
-            $nationality = trim((string) ($row['nationality'] ?? ''));
+            $nationality = Nationalities::normalize($row['nationality'] ?? '');
             $orcid = trim((string) ($row['orcid'] ?? ''));
             $role = trim((string) ($row['role'] ?? ''));
             $isCorresponding = filter_var($row['is_corresponding'] ?? false, FILTER_VALIDATE_BOOLEAN);

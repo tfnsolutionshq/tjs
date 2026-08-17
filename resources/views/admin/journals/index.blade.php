@@ -648,11 +648,7 @@
             @php
                 $theme = $journal->themeConfig();
                 $accent = $theme['primary'] ?? '#2563eb';
-                $words = preg_split('/\s+/', trim($journal->title)) ?: [];
-                $initials = collect($words)->filter()->take(3)->map(fn ($w) => strtoupper(substr($w, 0, 1)))->implode('');
-                if (strlen($initials) < 2) {
-                    $initials = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $journal->title) ?: 'JN', 0, 3));
-                }
+                $initials = $journal->displayInitials();
                 $desc = $journal->subtitle ?: \Illuminate\Support\Str::limit(strip_tags($journal->description ?? ''), 180);
             @endphp
             <article class="aj-card" style="--j-accent: {{ $accent }}" x-data="{ open: false }" @click.outside="open = false">
@@ -705,7 +701,7 @@
                                 <p class="aj-list-stats">
                                     <span>{{ number_format($journal->articles_count) }} articles</span>
                                     <span>{{ number_format($journal->volumes_count) }} volumes</span>
-                                    <span>{{ number_format($journal->submissions_count) }} subs</span>
+                                    <span>{{ number_format($journal->submissions_count) }} submissions</span>
                                 </p>
                             </div>
                         </div>
@@ -739,7 +735,7 @@
                                 </div>
                                 <div class="aj-metric__text">
                                     <strong>{{ number_format($journal->submissions_count) }}</strong>
-                                    <span>Subs</span>
+                                    <span>Submissions</span>
                                 </div>
                             </div>
                         </div>
