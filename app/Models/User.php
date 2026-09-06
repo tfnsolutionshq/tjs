@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -25,6 +24,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'orcid',
         'bio',
         'avatar_path',
+        'avatar_disk',
         'position',
         'is_public_reviewer',
     ];
@@ -58,11 +58,8 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->avatar_path;
         }
 
-        if (Storage::disk('public')->exists($this->avatar_path)) {
-            return Storage::disk('public')->url($this->avatar_path);
-        }
-
-        return null;
+        return app(\App\Services\Storage\HybridDisk::class)
+            ->url($this->avatar_path, \App\Services\Storage\HybridDisk::KIND_MEDIA, $this->avatar_disk);
     }
 
     public function avatarInitial(): string
@@ -95,6 +92,34 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return $this->hasMany(ReviewerAssignment::class, 'reviewer_id')->exists();
+    }
+
+    public function canAccessProductionQueue(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->journals()
+            ->wherePivot('role', \App\Support\JournalTeamRoles::PRODUCTION_EDITOR)
+            ->exists();
+    }
+
+    /**
+     * Journals where this user is assigned as Production Editor.
+     *
+     * @return \Illuminate\Support\Collection<int, Journal>
+     */
+    public function productionJournals()
+    {
+        if ($this->isAdmin()) {
+            return Journal::query()->orderBy('title')->get();
+        }
+
+        return $this->journals()
+            ->wherePivot('role', \App\Support\JournalTeamRoles::PRODUCTION_EDITOR)
+            ->orderBy('title')
+            ->get();
     }
 
     /**
@@ -181,12 +206,12 @@ class User extends Authenticatable implements MustVerifyEmail
             return 'admin.dashboard';
         }
 
-        if ($this->managedJournals()->isNotEmpty()) {
-            return 'journal.manage.dashboard';
+        if ($this->canAccessReviewQueue() && $this->role === 'reviewer' && $this->managedJournals()->isEmpty() && ! $this->canAccessProductionQueue()) {
+            return 'reviewer.reviews.index';
         }
 
-        if ($this->canAccessReviewQueue() && $this->role === 'reviewer') {
-            return 'reviewer.reviews.index';
+        if ($this->canAccessProductionQueue() && $this->managedJournals()->isEmpty() && ! $this->canAccessReviewQueue()) {
+            return 'production.queue.index';
         }
 
         return 'dashboard';
@@ -199,12 +224,6 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function homeRouteParameters(): array
     {
-        if ($this->homeRouteName() === 'journal.manage.dashboard') {
-            $journal = $this->managedJournals()->first();
-
-            return $journal ? ['journal' => $journal] : [];
-        }
-
         return [];
     }
 

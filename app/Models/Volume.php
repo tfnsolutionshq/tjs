@@ -5,13 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 class Volume extends Model
 {
     protected $fillable = [
         'journal_id', 'volume_number', 'year', 'title', 'introduction',
-        'issn', 'cover_path', 'status',
+        'issn', 'cover_path', 'cover_disk', 'status',
     ];
 
     public function journal(): BelongsTo
@@ -35,11 +34,13 @@ class Volume extends Model
             return null;
         }
 
-        if (Storage::disk('public')->exists($this->cover_path)) {
-            return Storage::disk('public')->url($this->cover_path);
+        $url = app(\App\Services\Storage\HybridDisk::class)
+            ->url($this->cover_path, \App\Services\Storage\HybridDisk::KIND_MEDIA, $this->cover_disk);
+
+        if ($url) {
+            return $url;
         }
 
-        // Legacy private-disk covers remain reachable for crawlers via controller.
         if ($this->journal) {
             return route('journals.volumes.cover', [$this->journal, $this]);
         }

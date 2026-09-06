@@ -296,9 +296,13 @@
                 <div class="ja-actions">
                     <a href="{{ route('journal.manage.announcements.edit', [$journal, $announcement]) }}" class="admin-btn admin-btn-secondary">Edit</a>
                     @if($isCall && $announcement->acceptsSubmissions())
-                        <form method="POST" action="{{ route('journal.manage.announcements.close', [$journal, $announcement]) }}" onsubmit="return confirm('Close this call for submissions now?')">
+                        <form method="POST" action="{{ route('journal.manage.announcements.close', [$journal, $announcement]) }}">
                             @csrf
-                            <button type="submit" class="admin-btn admin-btn-secondary">Close call</button>
+                            <button
+                                type="button"
+                                class="admin-btn admin-btn-secondary"
+                                onclick="if (confirm(@js('Close “'.$announcement->title.'” now? Authors will no longer be able to submit to this call.'))) { this.closest('form').requestSubmit(); }"
+                            >Close call</button>
                         </form>
                     @endif
                     @if($announcement->submissions_count === 0)

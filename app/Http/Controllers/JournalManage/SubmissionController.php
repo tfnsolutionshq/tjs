@@ -30,11 +30,16 @@ class SubmissionController extends Controller
         }
 
         $allowedStatuses = [
+            'fee_pending',
             'submitted',
             'under_review',
             'revision_requested',
             'resubmitted',
-            'approved',
+            'publication_fee_pending',
+            'ready_for_production',
+            'in_production',
+            'ready_to_publish',
+            'published',
             'rejected',
         ];
         if ($status !== null && ! in_array($status, $allowedStatuses, true)) {
@@ -59,11 +64,15 @@ class SubmissionController extends Controller
 
         $stats = [
             'total' => $scoped()->count(),
+            'fee_pending' => $scoped()->where('status', \App\Support\SubmissionStatus::FEE_PENDING)->count(),
             'submitted' => $scoped()->where('status', 'submitted')->count(),
             'under_review' => $scoped()->where('status', 'under_review')->count(),
             'revision_requested' => $scoped()->where('status', 'revision_requested')->count(),
             'resubmitted' => $scoped()->where('status', 'resubmitted')->count(),
-            'approved' => $scoped()->where('status', 'approved')->count(),
+            'approved' => $scoped()->whereIn('status', array_merge(
+                \App\Support\SubmissionStatus::productionQueueStatuses(),
+                [\App\Support\SubmissionStatus::PUBLICATION_FEE_PENDING]
+            ))->count(),
             'rejected' => $scoped()->where('status', 'rejected')->count(),
         ];
 
@@ -99,10 +108,12 @@ class SubmissionController extends Controller
 
         $submission->load([
             'journal',
+            'journalFee',
             'issue.volume',
             'announcement',
             'author',
             'reviewer',
+            'publicationJournalFee',
             'assignments.reviewer',
             'timelines.user',
             'revisions.uploader',

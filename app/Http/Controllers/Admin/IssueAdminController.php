@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Issue;
 use App\Models\Journal;
+use App\Models\JournalFee;
 use App\Models\Volume;
+use App\Support\JournalFeePurpose;
 use App\Services\Storage\ArticleStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +37,10 @@ class IssueAdminController extends Controller
             'period_end' => ['nullable', 'date', 'after_or_equal:period_start'],
             'status' => ['required', 'in:draft,published'],
             'cover' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'journal_fee_id' => ['nullable', 'integer'],
         ]);
+
+        $publicationFee = $this->resolvePublicationFee($journal, $data['journal_fee_id'] ?? null);
 
         $issue = $volume->issues()->create([
             'issue_number' => $data['issue_number'],
@@ -43,10 +48,11 @@ class IssueAdminController extends Controller
             'period_start' => $data['period_start'] ?? null,
             'period_end' => $data['period_end'] ?? null,
             'status' => $data['status'],
+            'journal_fee_id' => $publicationFee?->id,
         ]);
 
         if ($request->hasFile('cover')) {
-            $issue->cover_path = $this->storage->storeIssueCover($issue, $request->file('cover'));
+            [$issue->cover_path, $issue->cover_disk] = $this->storage->storeIssueCover($issue, $request->file('cover'));
             $issue->save();
         }
 
@@ -75,7 +81,10 @@ class IssueAdminController extends Controller
             'period_end' => ['nullable', 'date', 'after_or_equal:period_start'],
             'status' => ['required', 'in:draft,published'],
             'cover' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'journal_fee_id' => ['nullable', 'integer'],
         ]);
+
+        $publicationFee = $this->resolvePublicationFee($journal, $data['journal_fee_id'] ?? null);
 
         $issue->update([
             'issue_number' => $data['issue_number'],
@@ -83,10 +92,11 @@ class IssueAdminController extends Controller
             'period_start' => $data['period_start'] ?? null,
             'period_end' => $data['period_end'] ?? null,
             'status' => $data['status'],
+            'journal_fee_id' => $publicationFee?->id,
         ]);
 
         if ($request->hasFile('cover')) {
-            $issue->cover_path = $this->storage->storeIssueCover($issue, $request->file('cover'));
+            [$issue->cover_path, $issue->cover_disk] = $this->storage->storeIssueCover($issue, $request->file('cover'));
             $issue->save();
         }
 
@@ -102,5 +112,19 @@ class IssueAdminController extends Controller
         }
 
         return route('admin.volumes.index', $journal);
+    }
+
+    private function resolvePublicationFee(Journal $journal, mixed $feeId): ?JournalFee
+    {
+        if (! $feeId) {
+            return null;
+        }
+
+        return JournalFee::query()
+            ->where('journal_id', $journal->id)
+            ->where('id', (int) $feeId)
+            ->active()
+            ->forPurpose(JournalFeePurpose::ARTICLE)
+            ->first();
     }
 }

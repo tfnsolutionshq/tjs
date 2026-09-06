@@ -2,6 +2,9 @@
     $board = $board ?? $journal->editorialBoard()->orderBy('sort_order')->get();
     $manageJournal = $manageJournal ?? null;
     $canMutate = $canMutate ?? true;
+    $roleOptions = \App\Support\EditorialBoardRoles::options();
+    $oldRole = old('role_title');
+    $roleIsCustom = filled($oldRole) && ! in_array($oldRole, $roleOptions, true);
     $storeUrl = $manageJournal
         ? route('journal.manage.editorial-board.store', $manageJournal)
         : route('admin.editorial-board.store', $journal);
@@ -10,7 +13,7 @@
         : route('admin.editorial-board.destroy', [$journal, $member]);
 @endphp
 
-<section class="jf-card" style="max-width:72rem;margin-top:1rem" id="editorial-board">
+<section class="jf-card" style="width:100%;margin-top:1rem" id="editorial-board">
     <div class="jf-card__head">
         <h2 class="jf-card__title">Editorial board</h2>
         <p class="jf-card__desc">Shown on the public editorial board page for this journal.</p>
@@ -51,9 +54,38 @@
                         <input id="board_name" name="name" type="text" class="jf-input" required value="{{ old('name') }}">
                         @error('name')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
-                    <div class="jf-field">
+                    <div
+                        class="jf-field"
+                        x-data="{
+                            role: @js($roleIsCustom ? '__other' : ($oldRole ?: '')),
+                            custom: @js($roleIsCustom ? $oldRole : ''),
+                        }"
+                    >
                         <x-form-label for="board_role" field="board.role">Role title</x-form-label>
-                        <input id="board_role" name="role_title" type="text" class="jf-input" value="{{ old('role_title') }}" placeholder="Editor-in-Chief">
+                        <select
+                            id="board_role"
+                            class="jf-input"
+                            x-model="role"
+                            @change="if (role !== '__other') custom = ''"
+                        >
+                            <option value="">Select a role…</option>
+                            @foreach($roleOptions as $role)
+                                <option value="{{ $role }}">{{ $role }}</option>
+                            @endforeach
+                            <option value="__other">Other…</option>
+                        </select>
+                        <input
+                            type="text"
+                            class="jf-input"
+                            style="margin-top:.55rem"
+                            placeholder="Custom role title"
+                            x-show="role === '__other'"
+                            x-cloak
+                            x-model="custom"
+                            :required="role === '__other'"
+                        >
+                        <input type="hidden" name="role_title" :value="role === '__other' ? custom : role">
+                        @error('role_title')<p class="jf-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="jf-field">
                         <x-form-label for="board_affiliation" field="board.affiliation">Affiliation</x-form-label>

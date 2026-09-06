@@ -21,6 +21,7 @@
         ? route('journal.manage.submissions.update-review-type', [$manageJournal, $submission])
         : route('admin.submissions.update-review-type', $submission);
     $effectiveReviewType = $submission->effectiveReviewType();
+    $workflowBlocked = $submission->blocksEditorialProgress();
 @endphp
 
 <div class="mt-2 flex flex-wrap gap-2">
@@ -49,7 +50,7 @@
     @if($submission->abstract)
         <div>
             <p class="font-medium text-slate-900">Abstract</p>
-            <p class="mt-1 whitespace-pre-wrap text-slate-600">{{ $submission->abstract }}</p>
+            <div class="mt-1 tjs-prose text-slate-600">{!! \App\Support\SafeHtml::display($submission->abstract) !!}</div>
         </div>
     @endif
     @if($submission->review_comment)
@@ -63,6 +64,20 @@
     @endif
 </div>
 
+@if($workflowBlocked)
+    <div class="tjs-card mt-6 p-4 sm:p-6" style="border-color:#fde68a;background:#fffbeb">
+        <h2 class="text-base font-semibold text-amber-900">Submission fee pending</h2>
+        <p class="mt-1 text-sm text-amber-800">
+            The author must pay the submission fee before editorial workflow can continue.
+            You can view this submission, but reviewer assignment, review, and production are unavailable.
+            @if($submission->journalFee)
+                Fee: {{ $submission->journalFee->formattedAmount() }} ({{ $submission->journalFee->name }}).
+            @endif
+        </p>
+    </div>
+@endif
+
+@if(! $workflowBlocked)
 <div class="tjs-card mt-6 p-4 sm:p-6">
     <h2 class="text-base font-semibold text-slate-900">Review type</h2>
     <p class="mt-1 text-sm text-slate-500">{{ ReviewType::description($effectiveReviewType) }}</p>
@@ -129,11 +144,39 @@
         </div>
     </form>
 </div>
+@endif
 
-@if($submission->status === 'approved')
+@if($submission->status === 'publication_fee_pending')
+    <div class="tjs-card mt-6 p-4 sm:p-6">
+        <h2 class="text-base font-semibold text-slate-900">Publication fee pending</h2>
+        <p class="mt-1 text-sm text-slate-600">
+            This submission was accepted after review. The author must pay the issue publication fee before you can publish it to the catalog.
+            @if($submission->publicationJournalFee)
+                Fee: {{ $submission->publicationJournalFee->formattedAmount() }} ({{ $submission->publicationJournalFee->name }}).
+            @endif
+        </p>
+    </div>
+@endif
+
+@if(in_array($submission->status, ['ready_for_production', 'in_production', 'ready_to_publish'], true))
+    @php $productionFile = $submission->currentProductionFile(); @endphp
+    <div class="tjs-card mt-6 p-4 sm:p-6">
+        <h2 class="text-base font-semibold text-slate-900">Production status</h2>
+        <p class="mt-1 text-sm text-slate-600">
+            Status: {{ \App\Support\SubmissionStatus::label($submission->status) }}.
+            @if($productionFile)
+                Final production document on file (version {{ $productionFile->version }}).
+            @else
+                Awaiting final production document from the Production Editor.
+            @endif
+        </p>
+    </div>
+@endif
+
+@if($submission->status === 'ready_to_publish')
     <div class="tjs-card mt-6 p-4 sm:p-6">
         <h2 class="text-base font-semibold text-slate-900">Publish to issue</h2>
-        <p class="mt-1 text-sm text-slate-600">Create or update the catalog article from this approved submission.</p>
+        <p class="mt-1 text-sm text-slate-600">Production is complete. Publishing will use the final production document — not the author’s original manuscript.</p>
         <form method="POST" action="{{ $publishUrl }}" class="mt-4 grid gap-4 sm:grid-cols-2">
             @csrf
             <div class="sm:col-span-2">

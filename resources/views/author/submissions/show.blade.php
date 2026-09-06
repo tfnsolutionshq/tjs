@@ -53,6 +53,40 @@
         @if (session('status'))
             <div class="mp-flash">{{ session('status') }}</div>
         @endif
+        @if (session('error'))
+            <div class="mp-flash mp-flash--error">{{ session('error') }}</div>
+        @endif
+
+        @if($submission->status === 'fee_pending' && $submission->journalFee)
+            <div class="sd-note sd-note--warn">
+                <p style="margin:0;font-weight:700;color:#c2410c">Submission fee required</p>
+                <p style="margin:.35rem 0 .75rem;color:#9a3412;line-height:1.5">
+                    Pay {{ number_format($submission->journalFee->amount) }} {{ strtoupper($submission->journalFee->currency) }}
+                    ({{ $submission->journalFee->name }}) to send this manuscript to the editors.
+                </p>
+                <form method="POST" action="{{ route('author.submissions.pay-fee', $submission) }}">
+                    @csrf
+                    <button type="submit" class="mp-btn mp-btn-primary">Pay submission fee</button>
+                </form>
+            </div>
+        @endif
+
+        @if($submission->status === 'publication_fee_pending' && $submission->publicationJournalFee)
+            <div class="sd-note sd-note--warn">
+                <p style="margin:0;font-weight:700;color:#047857">Accepted — publication fee due</p>
+                <p style="margin:.35rem 0 .75rem;color:#065f46;line-height:1.5">
+                    Your manuscript was accepted after review. Pay
+                    {{ number_format($submission->publicationJournalFee->amount) }}
+                    {{ strtoupper($submission->publicationJournalFee->currency) }}
+                    ({{ $submission->publicationJournalFee->name }}) to proceed toward publication
+                    @if($submission->issue) in {{ $submission->issue->label() }} @endif.
+                </p>
+                <form method="POST" action="{{ route('author.submissions.pay-publication-fee', $submission) }}">
+                    @csrf
+                    <button type="submit" class="mp-btn mp-btn-primary">Pay publication fee</button>
+                </form>
+            </div>
+        @endif
 
         <header class="sd-hero">
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem">
@@ -114,7 +148,7 @@
                 @if($submission->abstract)
                     <div>
                         <p class="sd-label">Abstract</p>
-                        <p class="sd-value" style="white-space:pre-wrap;color:var(--muted)">{{ $submission->abstract }}</p>
+                        <div class="sd-value tjs-prose" style="color:var(--muted)">{!! \App\Support\SafeHtml::display($submission->abstract) !!}</div>
                     </div>
                 @else
                     <p style="margin:0;font-size:.88rem;color:var(--muted)">No abstract provided.</p>

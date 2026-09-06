@@ -1,8 +1,12 @@
-# TFN Journal System (TJS)
+# TurboFlux Journal System (TJS)
 
-Multi-journal publishing platform for **Turbo Flux Network Solutions**.
+> TurboFlux Journal System (TJS): a modern publishing solution for anyone who publishes—built to simplify, professionalize, and scale the entire article publishing process.
 
-TJS runs branded public journal sites, author submissions, peer review, editorial management, memberships, and Paystack checkout for paid full text — with platform-level admin separate from per-journal team roles.
+TurboFlux Journal System (TJS) is a modern, all-in-one publishing platform designed for individual researchers, scholars, academics, authors, research groups, universities, academic departments, professional associations, learned societies, publishers, institutions, corporations, government agencies, NGOs, and other organisations that publish scholarly, scientific, technical, professional, or general-interest articles.
+
+TJS streamlines the entire journal publishing lifecycle in one powerful platform—from article submission and editorial management to peer review, citation formatting, publication, DOI deposition, access-controlled full text, and long-term journal management. It supports multiple journals from a single platform, with customizable branding themes.
+
+Built for **Turbo Flux Network Solutions**.
 
 ## Features
 
@@ -15,7 +19,8 @@ TJS runs branded public journal sites, author submissions, peer review, editoria
   - Same user can be an ordinary member in one journal and a reviewer in another
 - **Editorial workflow** — submissions, assignments, revisions, publish to issue
 - **Public journal UX** — current issue, archives, browse, article pages, APA 7 cite/copy
-- **Payments** — Paystack article purchase + memberships (callback + signed webhook)
+- **DOI** — Crossref deposit with platform credit pool or journal-owned credentials
+- **Payments** — Paystack article purchase + memberships (callback + signed webhook); journal personal keys or platform split code (`SPL_`)
 - **SEO** — Google Scholar / citation meta, JSON-LD, PDF handling
 
 ## Stack
@@ -24,6 +29,7 @@ TJS runs branded public journal sites, author submissions, peer review, editoria
 - Blade + Alpine.js + Vite
 - SQLite (local default) or MySQL
 - Paystack
+- Optional AWS S3 for documents/media (`DOCUMENTS_DISK` / `MEDIA_DISK`)
 
 ## Local setup
 
@@ -93,6 +99,9 @@ php artisan test --filter=JournalAccessAndSeoTest
 ## Deploy
 
 See [deploy/DEPLOY.md](deploy/DEPLOY.md).
+
+Demo / showcase: `tjs.tfnsolutions.us`  
+Live publishing (planned): `tjsjournals.org` with article files on S3
 
 ## License
 

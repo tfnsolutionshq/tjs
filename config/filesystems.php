@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | TJS storage roles
+    |--------------------------------------------------------------------------
+    |
+    | Documents (manuscripts, galleys, submissions) and public media (covers,
+    | logos, avatars) can live on local disk or S3 independently. Reads always
+    | fall back across disks so switching providers does not hide older files.
+    |
+    */
+
+    'documents' => env('DOCUMENTS_DISK', env('FILESYSTEM_DISK', 'local')),
+    'media' => env('MEDIA_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

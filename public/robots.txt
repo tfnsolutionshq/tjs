@@ -1,2 +1,31 @@
+# Platform catalog is indexed via sitemaps. Private portals stay out of search.
 User-agent: *
-Disallow:
+Allow: /
+Allow: /journals
+Allow: /j/
+Allow: /sitemap.xml
+Allow: /sitemap-site.xml
+
+# Platform auth & member portals
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /confirm-password
+Disallow: /dashboard
+Disallow: /memberships
+Disallow: /profile
+Disallow: /my/
+Disallow: /author/
+Disallow: /reviewer/
+Disallow: /admin
+Disallow: /payments/
+Disallow: /paystack/
+
+# Journal-scoped auth and management (public catalog under /j/{slug}/ stays allowed)
+Disallow: /j/*/login
+Disallow: /j/*/register
+Disallow: /j/*/manage
+
+Sitemap: /sitemap.xml

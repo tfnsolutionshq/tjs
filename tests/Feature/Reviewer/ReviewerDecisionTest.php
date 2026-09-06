@@ -47,7 +47,7 @@ class ReviewerDecisionTest extends TestCase
 
         $submission->refresh();
 
-        $this->assertSame('approved', $submission->status);
+        $this->assertSame('ready_for_production', $submission->status);
         $this->assertSame('Document is correctly formatted.', $submission->review_comment);
         $this->assertNull($submission->rejection_reason);
         $this->assertDatabaseHas('submission_timelines', [

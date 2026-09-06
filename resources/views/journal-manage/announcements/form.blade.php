@@ -236,14 +236,99 @@
         box-shadow: 0 8px 24px rgba(15,23,42,.035);
     }
     .jaf-actions .admin-btn { min-height: 2.5rem; }
+    .jaf-quick {
+        border: 1px dashed #cbd5e1;
+        border-radius: .9rem;
+        background: #f8fafc;
+        padding: .95rem 1rem;
+        display: grid;
+        gap: .85rem;
+    }
+    .jaf-quick__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: .55rem;
+    }
+    .jaf-quick__title { margin: 0; font-size: .84rem; font-weight: 800; color: var(--ink); }
+    .jaf-quick__text { margin: .25rem 0 0; font-size: .74rem; color: var(--muted); line-height: 1.45; }
+    .jaf-quick__error {
+        margin: 0;
+        padding: .65rem .75rem;
+        border-radius: .65rem;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+        font-size: .76rem;
+        font-weight: 600;
+    }
     [x-cloak] { display: none !important; }
 </style>
+
+<script>
+function announcementForm(cfg) {
+    return {
+        type: cfg.type,
+        issues: cfg.issues || [],
+        issueId: cfg.issueId || '',
+        showCreateIssue: cfg.showCreateIssue,
+        creatingIssue: false,
+        quickIssueError: '',
+        catalog: { ...cfg.catalogDefaults },
+        async createIssue() {
+            this.creatingIssue = true;
+            this.quickIssueError = '';
+            try {
+                const response = await fetch(cfg.quickIssueUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': cfg.csrf,
+                    },
+                    body: JSON.stringify({
+                        volume_number: Number(this.catalog.volume_number),
+                        year: Number(this.catalog.year),
+                        volume_title: this.catalog.volume_title || null,
+                        issue_number: Number(this.catalog.issue_number),
+                        issue_title: this.catalog.issue_title || null,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.quickIssueError = data.message
+                        || Object.values(data.errors || {}).flat().join(' ')
+                        || 'Could not create issue.';
+                    return;
+                }
+                this.issues.unshift(data.issue);
+                this.issueId = data.issue.id;
+                this.showCreateIssue = false;
+                this.catalog.issue_number = Number(this.catalog.issue_number) + 1;
+            } catch (error) {
+                this.quickIssueError = 'Could not create issue. Check your connection and try again.';
+            } finally {
+                this.creatingIssue = false;
+            }
+        },
+    };
+}
+</script>
 
 <form
     method="POST"
     action="{{ $announcement->exists ? route('journal.manage.announcements.update', [$journal, $announcement]) : route('journal.manage.announcements.store', $journal) }}"
     class="jaf"
-    x-data="{ type: @js(old('type', $announcement->type ?? $callType)) }"
+    x-data="announcementForm({
+        type: @js(old('type', $announcement->type ?? $callType)),
+        issues: @js($issuesPayload),
+        issueId: @js((string) old('issue_id', $announcement->issue_id ?? '')),
+        showCreateIssue: @js($issues->isEmpty() || $errors->has('issue_id')),
+        catalogDefaults: @js($catalogDefaults),
+        quickIssueUrl: @js(route('journal.manage.announcements.quick-issue', $journal)),
+        csrf: @js(csrf_token()),
+    })"
 >
     @csrf
     @if($announcement->exists)
@@ -298,8 +383,23 @@
                     </div>
 
                     <div class="jaf-field jaf-span-2">
-                        <x-form-label for="body" field="announcement.body">Body</x-form-label>
-                        <textarea id="body" name="body" rows="8" class="jaf-textarea" placeholder="Full announcement text for the public detail page">{{ old('body', $announcement->body) }}</textarea>
+                        <template x-if="type === @js($callType)">
+                            <x-form-label for="body" field="announcement.guidelines">Submission guidelines</x-form-label>
+                        </template>
+                        <template x-if="type !== @js($callType)">
+                            <x-form-label for="body" field="announcement.body">Body</x-form-label>
+                        </template>
+                        <x-rich-text
+                            id="body"
+                            name="body"
+                            :value="old('body', $announcement->body)"
+                            placeholder="Describe what authors should prepare, how to format manuscripts, and any fees that apply…"
+                            :rows="8"
+                        />
+                        <p class="jaf-hint" x-show="type === @js($callType)" x-cloak>
+                            Shown on the public call page and author submission form. Mention submission fees, publication fees (APC), file format (DOC/DOCX), and scope.
+                        </p>
+                        <p class="jaf-hint" x-show="type !== @js($callType)" x-cloak>Use the toolbar for bold, lists, headings, and links.</p>
                         @error('body')<p class="jaf-error">{{ $message }}</p>@enderror
                     </div>
                 </div>
@@ -313,25 +413,69 @@
                 <div class="jaf-card__body jaf-grid">
                     <div class="jaf-field jaf-span-2">
                         <x-form-label for="issue_id" field="announcement.issue" required reqClass="jaf-req">Target issue</x-form-label>
-                        @if($issues->isEmpty())
-                            <div class="jaf-alert">
-                                <span aria-hidden="true">⚠</span>
-                                <span>
-                                    You need at least one issue before opening a call.
-                                    <a href="{{ route('journal.manage.volumes.index', $journal) }}">Create a volume &amp; issue</a>
-                                    first under Catalog.
-                                </span>
-                            </div>
-                        @else
-                            <select id="issue_id" name="issue_id" class="jaf-select" :required="type === @js($callType)">
+
+                        <div x-show="issues.length > 0 && !showCreateIssue" x-cloak>
+                            <select id="issue_id" class="jaf-select" x-model="issueId">
                                 <option value="">Select issue…</option>
-                                @foreach($issues as $issue)
-                                    <option value="{{ $issue->id }}" @selected((string) old('issue_id', $announcement->issue_id) === (string) $issue->id)>
-                                        {{ $issue->label() }}@if($issue->title) — {{ $issue->title }}@endif
-                                    </option>
-                                @endforeach
+                                <template x-for="issue in issues" :key="issue.id">
+                                    <option :value="issue.id" x-text="issue.label"></option>
+                                </template>
                             </select>
-                        @endif
+                            <p class="jaf-hint" style="margin-top:.45rem">
+                                Need another issue?
+                                <button type="button" class="admin-btn admin-btn-secondary admin-btn-sm" style="margin-left:.25rem" @click="showCreateIssue = true">Create volume &amp; issue</button>
+                            </p>
+                        </div>
+
+                        <div class="jaf-quick" x-show="issues.length === 0 || showCreateIssue" x-cloak>
+                            <div class="jaf-quick__head">
+                                <div>
+                                    <p class="jaf-quick__title" x-text="issues.length ? 'Create a new volume &amp; issue' : 'Set up your first volume &amp; issue'"></p>
+                                    <p class="jaf-quick__text">Create catalog entries here — the new issue will be selected automatically for this call.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="admin-btn admin-btn-secondary admin-btn-sm"
+                                    x-show="issues.length > 0"
+                                    x-cloak
+                                    @click="showCreateIssue = false; quickIssueError = ''"
+                                >Cancel</button>
+                            </div>
+
+                            <div class="jaf-grid jaf-grid--2">
+                                <div class="jaf-field">
+                                    <label for="quick_volume_number">Volume number</label>
+                                    <input id="quick_volume_number" type="number" min="1" class="jaf-input" x-model="catalog.volume_number">
+                                </div>
+                                <div class="jaf-field">
+                                    <label for="quick_year">Year</label>
+                                    <input id="quick_year" type="number" min="1900" max="2100" class="jaf-input" x-model="catalog.year">
+                                </div>
+                                <div class="jaf-field">
+                                    <label for="quick_volume_title">Volume title (optional)</label>
+                                    <input id="quick_volume_title" type="text" class="jaf-input" x-model="catalog.volume_title" placeholder="e.g. Inaugural Volume">
+                                </div>
+                                <div class="jaf-field">
+                                    <label for="quick_issue_number">Issue number</label>
+                                    <input id="quick_issue_number" type="number" min="1" class="jaf-input" x-model="catalog.issue_number">
+                                </div>
+                                <div class="jaf-field jaf-span-2">
+                                    <label for="quick_issue_title">Issue title (optional)</label>
+                                    <input id="quick_issue_title" type="text" class="jaf-input" x-model="catalog.issue_title" placeholder="e.g. General Issue — Applied Research from UNIZIK">
+                                </div>
+                            </div>
+
+                            <p class="jaf-quick__error" x-show="quickIssueError" x-text="quickIssueError" x-cloak></p>
+
+                            <div>
+                                <button type="button" class="admin-btn admin-btn-primary" :disabled="creatingIssue" @click="createIssue()">
+                                    <span x-text="creatingIssue ? 'Creating…' : 'Create &amp; select issue'"></span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <input type="hidden" name="issue_id" :value="issueId">
+
                         @error('issue_id')<p class="jaf-error">{{ $message }}</p>@enderror
                     </div>
 
@@ -375,6 +519,7 @@
                 <div class="jaf-card__body">
                     <ul class="jaf-tips">
                         <li>Calls must target a single issue — authors submit through the open call picker.</li>
+                        <li>Use submission guidelines in the body to explain requirements and any submission or publication fees.</li>
                         <li>Closing a call stops new submissions; existing manuscripts stay in the workflow.</li>
                         <li>News posts do not accept submissions — use them for editorial updates.</li>
                     </ul>

@@ -23,7 +23,7 @@ class CallForSubmissionService
             ->where(function (Builder $query) {
                 $query->whereNull('closes_at')->orWhere('closes_at', '>', now());
             })
-            ->whereHas('journal', fn (Builder $journal) => $journal->where('is_active', true));
+            ->whereHas('journal', fn (Builder $journal) => $journal->listed());
     }
 
     /**
@@ -33,7 +33,7 @@ class CallForSubmissionService
     {
         return $this->openCallsQuery()
             ->when($journalId, fn (Builder $query) => $query->where('journal_id', $journalId))
-            ->with(['journal:id,title,slug,review_type', 'issue.volume'])
+            ->with(['journal:id,title,slug,review_type', 'issue.volume', 'issue.journalFee'])
             ->orderBy('closes_at')
             ->orderByDesc('opens_at')
             ->get();
@@ -52,7 +52,7 @@ class CallForSubmissionService
             ->whereNotNull('issue_id')
             ->whereNotNull('opens_at')
             ->where('opens_at', '>', now())
-            ->whereHas('journal', fn (Builder $journal) => $journal->where('is_active', true))
+            ->whereHas('journal', fn (Builder $journal) => $journal->listed())
             ->with(['journal:id,title,slug', 'issue.volume'])
             ->orderBy('opens_at')
             ->limit($limit)
@@ -72,7 +72,7 @@ class CallForSubmissionService
             ->whereNotNull('issue_id')
             ->whereNotNull('closes_at')
             ->where('closes_at', '<=', now())
-            ->whereHas('journal', fn (Builder $journal) => $journal->where('is_active', true))
+            ->whereHas('journal', fn (Builder $journal) => $journal->listed())
             ->with(['journal:id,title,slug', 'issue.volume'])
             ->orderByDesc('closes_at')
             ->limit($limit)
@@ -95,7 +95,7 @@ class CallForSubmissionService
 
         $announcement->loadMissing('journal');
 
-        if (! $announcement->journal?->is_active) {
+        if (! $announcement->journal?->isListed()) {
             return false;
         }
 

@@ -1,5 +1,14 @@
 @extends('layouts.public')
 @section('title', 'Journals | '.config('tjs.name'))
+@section('meta_description', 'Browse active journals published on '.config('tjs.full_name').'.')
+@section('canonical', route('journals.index'))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->site(
+        'Journals | '.config('tjs.name'),
+        'Browse active journals published on '.config('tjs.full_name').'.',
+        route('journals.index')
+    )])
+@endsection
 @section('content')
 <style>
     :root {

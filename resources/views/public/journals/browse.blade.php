@@ -5,14 +5,12 @@
 @section('canonical', route('journals.browse', $journal))
 
 @section('seo')
-    <meta property="og:title" content="Browse | {{ $journal->title }}">
-    <meta property="og:description" content="Browse all published articles from {{ $journal->title }}.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('journals.browse', $journal) }}">
-    <meta property="og:site_name" content="{{ $journal->title }}">
-    @if($journal->headerImageUrl() || $journal->logoUrl())
-        <meta property="og:image" content="{{ $journal->headerImageUrl() ?: $journal->logoUrl() }}">
-    @endif
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'Browse | '.$journal->title,
+        'Browse all published articles from '.$journal->title.'.',
+        route('journals.browse', $journal)
+    )])
 @endsection
 
 @section('content')

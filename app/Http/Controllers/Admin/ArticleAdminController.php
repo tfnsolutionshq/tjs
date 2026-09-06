@@ -9,11 +9,15 @@ use App\Models\ArticleAuthor;
 use App\Models\Category;
 use App\Models\Issue;
 use App\Models\Journal;
+use App\Models\JournalFee;
 use App\Models\Volume;
 use App\Services\Articles\ArticleDocumentExtractor;
+use App\Services\Journal\JournalFeeResolver;
 use App\Services\Storage\ArticleStorage;
+use App\Support\JournalFeePurpose;
 use App\Support\Licenses;
 use App\Support\Nationalities;
+use App\Support\SafeHtml;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,8 +93,9 @@ class ArticleAdminController extends Controller
         $catalog = $this->placementCatalog();
         $categories = Category::query()->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug', 'journal_id']);
         $ocrAvailable = $this->extractor->tesseractAvailable();
+        $articleFeesByJournal = app(JournalFeeResolver::class)->articleFeesByJournal();
 
-        return view('admin.articles.create', compact('journals', 'catalog', 'categories', 'ocrAvailable'));
+        return view('admin.articles.create', compact('journals', 'catalog', 'categories', 'ocrAvailable', 'articleFeesByJournal'));
     }
 
     public function extract(Request $request): JsonResponse
@@ -244,7 +249,7 @@ class ArticleAdminController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validated($request);
+        $data = $this->applyArticlePricing($request, $this->validated($request));
         $previousPath = null;
 
         $article = DB::transaction(function () use ($request, $data, &$previousPath) {
@@ -264,6 +269,7 @@ class ArticleAdminController extends Controller
                 'license' => $data['license'] ?? null,
                 'page_range' => $data['page_range'] ?? null,
                 'visibility' => $data['visibility'],
+                'journal_fee_id' => $data['journal_fee_id'] ?? null,
                 'price_amount' => $data['price_amount'] ?? null,
                 'currency' => $data['currency'] ?? 'NGN',
                 'status' => $data['status'],
@@ -287,6 +293,10 @@ class ArticleAdminController extends Controller
             $this->logGalleyReplace($request, $article, $previousPath);
         }
 
+        if ($article->status === 'published') {
+            app(\App\Services\Doi\DoiDepositService::class)->maybeAutoDeposit($article->fresh(), $request->user());
+        }
+
         return $this->articlesRedirect($request, $article, 'Article created.', toEdit: false);
     }
 
@@ -306,6 +316,7 @@ class ArticleAdminController extends Controller
 
         $ocrAvailable = $this->extractor->tesseractAvailable();
         $selectedCategoryIds = $article->categories->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $articleFeesByJournal = app(JournalFeeResolver::class)->articleFeesByJournal();
 
         return view('admin.articles.edit', compact(
             'article',
@@ -314,13 +325,14 @@ class ArticleAdminController extends Controller
             'categories',
             'authorsPayload',
             'ocrAvailable',
-            'selectedCategoryIds'
+            'selectedCategoryIds',
+            'articleFeesByJournal',
         ));
     }
 
     public function update(Request $request, Article $article): RedirectResponse
     {
-        $data = $this->validated($request, $article);
+        $data = $this->applyArticlePricing($request, $this->validated($request, $article));
         $previousPath = $article->document_path;
         $galleyReplaced = false;
 
@@ -340,6 +352,7 @@ class ArticleAdminController extends Controller
                 'license' => $data['license'] ?? null,
                 'page_range' => $data['page_range'] ?? null,
                 'visibility' => $data['visibility'],
+                'journal_fee_id' => $data['journal_fee_id'] ?? null,
                 'price_amount' => $data['price_amount'] ?? null,
                 'currency' => $data['currency'] ?? 'NGN',
                 'status' => $data['status'],
@@ -368,6 +381,11 @@ class ArticleAdminController extends Controller
 
         if ($galleyReplaced) {
             $this->logGalleyReplace($request, $article->fresh(), $previousPath);
+        }
+
+        $article = $article->fresh();
+        if ($article && $article->status === 'published') {
+            app(\App\Services\Doi\DoiDepositService::class)->maybeAutoDeposit($article, $request->user());
         }
 
         return $this->articlesRedirect($request, $article, 'Article updated.', toEdit: true);
@@ -444,6 +462,7 @@ class ArticleAdminController extends Controller
             'license' => ['nullable', 'string', Licenses::rule()],
             'page_range' => ['nullable', 'string', 'max:64'],
             'visibility' => ['required', 'in:open,members_only,paid,closed'],
+            'journal_fee_id' => ['nullable', 'integer', 'exists:journal_fees,id'],
             'price_amount' => [$request->input('visibility') === 'paid' ? 'required' : 'nullable', 'integer', 'min:0'],
             'currency' => [$request->input('visibility') === 'paid' ? 'required' : 'nullable', 'string', 'max:8'],
             'status' => ['required', 'in:draft,published'],
@@ -463,6 +482,7 @@ class ArticleAdminController extends Controller
         ]);
 
         $data['doi'] = \App\Support\Doi::normalize($data['doi'] ?? null);
+        $data['abstract'] = SafeHtml::clean($data['abstract'] ?? null);
 
         return $data;
     }
@@ -704,5 +724,37 @@ class ArticleAdminController extends Controller
                 'new_path' => $article->document_path,
             ],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyArticlePricing(Request $request, array $data): array
+    {
+        if ($data['visibility'] !== 'paid') {
+            $data['journal_fee_id'] = null;
+            $data['price_amount'] = null;
+            $data['currency'] = null;
+
+            return $data;
+        }
+
+        $feeId = $request->integer('journal_fee_id') ?: null;
+        if ($feeId) {
+            $fee = JournalFee::query()
+                ->where('journal_id', $data['journal_id'])
+                ->where('id', $feeId)
+                ->active()
+                ->forPurpose(JournalFeePurpose::ARTICLE)
+                ->firstOrFail();
+            $data['journal_fee_id'] = $fee->id;
+            $data['price_amount'] = (int) $fee->amount;
+            $data['currency'] = strtoupper((string) $fee->currency);
+        } else {
+            $data['journal_fee_id'] = null;
+        }
+
+        return $data;
     }
 }

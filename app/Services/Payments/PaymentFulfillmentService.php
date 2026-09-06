@@ -3,18 +3,29 @@
 namespace App\Services\Payments;
 
 use App\Models\Article;
+use App\Models\Journal;
 use App\Models\Membership;
 use App\Models\MembershipPlan;
 use App\Models\PaymentTransaction;
 use App\Models\Purchase;
+use App\Models\Submission;
+use App\Models\SubmissionTimeline;
 use App\Models\User;
+use App\Services\Journal\SubmissionProductionService;
+use App\Support\JournalActivation;
+use App\Support\SubmissionStatus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class PaymentFulfillmentService
 {
-    public function __construct(private PaystackService $paystack)
-    {
+    public function __construct(
+        private PaystackService $paystack,
+        private PaymentReceiptService $receipts,
+        private JournalPaymentGatewayResolver $gateways,
+        private SubmissionProductionService $production,
+    ) {
     }
 
     public function startArticlePurchase(User $user, Article $article): array
@@ -35,14 +46,29 @@ class PaymentFulfillmentService
             throw new RuntimeException('You already own this article.');
         }
 
+        $article->loadMissing('journal');
+        $journal = $article->journal;
+        if (! $journal) {
+            throw new RuntimeException('Article journal is missing.');
+        }
+
+        $gateway = $this->gateways->forJournalIncome($journal);
+
         return $this->startTransaction(
             $user,
             Article::class,
             $article->id,
             (int) $article->price_amount,
             $article->currency ?: config('tjs.currency'),
-            ['purpose' => 'article_purchase', 'article_id' => $article->id],
-            route('payments.callback')
+            [
+                'purpose' => 'article_purchase',
+                'article_id' => $article->id,
+                'journal_id' => $journal->id,
+                'gateway_mode' => $gateway->mode,
+            ],
+            route('payments.callback'),
+            $gateway,
+            $journal->id,
         );
     }
 
@@ -52,8 +78,24 @@ class PaymentFulfillmentService
             throw new RuntimeException('This membership plan is inactive.');
         }
 
+        if ($plan->scope === 'platform' && ! config('tjs.membership.platform_enabled', true)) {
+            throw new RuntimeException('Platform membership purchases are currently disabled by the platform administrator.');
+        }
+
         if (app(\App\Services\Membership\MembershipCoverageService::class)->planIsCovered($user, $plan)) {
             throw new RuntimeException('You already have active membership that covers this plan.');
+        }
+
+        if ($plan->scope === 'journal') {
+            $journal = $plan->journal ?: Journal::query()->find($plan->journal_id);
+            if (! $journal) {
+                throw new RuntimeException('Membership plan journal is missing.');
+            }
+            $gateway = $this->gateways->forJournalIncome($journal);
+            $journalId = $journal->id;
+        } else {
+            $gateway = $this->gateways->platform();
+            $journalId = null;
         }
 
         return $this->startTransaction(
@@ -62,8 +104,137 @@ class PaymentFulfillmentService
             (string) $plan->id,
             (int) $plan->price_amount,
             $plan->currency ?: config('tjs.currency'),
-            ['purpose' => 'membership', 'plan_id' => $plan->id],
-            route('payments.callback')
+            [
+                'purpose' => 'membership',
+                'plan_id' => $plan->id,
+                'gateway_mode' => $gateway->mode,
+            ],
+            route('payments.callback'),
+            $gateway,
+            $journalId,
+        );
+    }
+
+    public function startSubmissionFeePayment(User $user, Submission $submission): array
+    {
+        if ((int) $submission->author_id !== (int) $user->id) {
+            throw new RuntimeException('You do not own this submission.');
+        }
+
+        if ($submission->status !== 'fee_pending') {
+            throw new RuntimeException('This submission does not require a fee payment.');
+        }
+
+        $submission->loadMissing(['journal', 'journalFee']);
+        $fee = $submission->journalFee;
+        if (! $fee || (int) $fee->amount < 1) {
+            throw new RuntimeException('Submission fee is not configured.');
+        }
+
+        $journal = $submission->journal;
+        if (! $journal) {
+            throw new RuntimeException('Submission journal is missing.');
+        }
+
+        $gateway = $this->gateways->forJournalIncome($journal);
+
+        return $this->startTransaction(
+            $user,
+            Submission::class,
+            $submission->id,
+            (int) $fee->amount,
+            $fee->currency ?: config('tjs.currency'),
+            [
+                'purpose' => 'submission_fee',
+                'submission_id' => $submission->id,
+                'journal_id' => $journal->id,
+                'journal_fee_id' => $fee->id,
+                'gateway_mode' => $gateway->mode,
+            ],
+            route('payments.callback'),
+            $gateway,
+            $journal->id,
+        );
+    }
+
+    public function startPublicationFeePayment(User $user, Submission $submission): array
+    {
+        if ((int) $submission->author_id !== (int) $user->id) {
+            throw new RuntimeException('You do not own this submission.');
+        }
+
+        if ($submission->status !== 'publication_fee_pending') {
+            throw new RuntimeException('This submission does not require a publication fee payment.');
+        }
+
+        $submission->loadMissing(['journal', 'publicationJournalFee']);
+        $fee = $submission->publicationJournalFee;
+        if (! $fee || (int) $fee->amount < 1) {
+            throw new RuntimeException('Publication fee is not configured.');
+        }
+
+        $journal = $submission->journal;
+        if (! $journal) {
+            throw new RuntimeException('Submission journal is missing.');
+        }
+
+        $gateway = $this->gateways->forJournalIncome($journal);
+
+        return $this->startTransaction(
+            $user,
+            Submission::class,
+            $submission->id,
+            (int) $fee->amount,
+            $fee->currency ?: config('tjs.currency'),
+            [
+                'purpose' => 'publication_fee',
+                'submission_id' => $submission->id,
+                'journal_id' => $journal->id,
+                'journal_fee_id' => $fee->id,
+                'gateway_mode' => $gateway->mode,
+            ],
+            route('payments.callback'),
+            $gateway,
+            $journal->id,
+        );
+    }
+
+    public function startJournalActivationPurchase(User $user, Journal $journal): array
+    {
+        if (! $user->canManageJournal($journal)) {
+            throw new RuntimeException('You do not manage this journal.');
+        }
+
+        if (! JournalActivation::enabled()) {
+            throw new RuntimeException('Journal activation payments are currently disabled by the platform administrator.');
+        }
+
+        if ($journal->isActivationCurrent()) {
+            throw new RuntimeException('This journal already has an active activation. Renew after it expires.');
+        }
+
+        $amount = JournalActivation::price();
+        if ($amount < 1) {
+            throw new RuntimeException('Journal activation price is not configured.');
+        }
+
+        $gateway = $this->gateways->platform();
+
+        return $this->startTransaction(
+            $user,
+            Journal::class,
+            (string) $journal->id,
+            $amount,
+            JournalActivation::currency(),
+            [
+                'purpose' => 'journal_activation',
+                'journal_id' => $journal->id,
+                'journal_slug' => $journal->slug,
+                'gateway_mode' => $gateway->mode,
+            ],
+            route('payments.callback'),
+            $gateway,
+            $journal->id,
         );
     }
 
@@ -71,13 +242,18 @@ class PaymentFulfillmentService
     {
         return DB::transaction(function () use ($reference, $providerPayload) {
             /** @var PaymentTransaction $tx */
-            $tx = PaymentTransaction::query()->where('reference', $reference)->lockForUpdate()->firstOrFail();
+            $tx = PaymentTransaction::query()
+                ->with('gatewayJournal')
+                ->where('reference', $reference)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             if ($tx->status === 'success') {
                 return $tx; // idempotent
             }
 
-            $verified = $providerPayload ?: $this->paystack->verify($reference);
+            $gateway = $this->gateways->contextFromTransaction($tx);
+            $verified = $providerPayload ?: $this->paystack->verify($reference, $gateway);
             $status = $verified['status'] ?? null;
             $amountKobo = (int) ($verified['amount'] ?? 0);
             $expectedKobo = (int) $tx->amount * 100;
@@ -96,6 +272,22 @@ class PaymentFulfillmentService
 
             $this->grantEntitlement($tx);
 
+            $txId = $tx->id;
+            $receipts = $this->receipts;
+            DB::afterCommit(function () use ($txId, $receipts) {
+                try {
+                    $paid = PaymentTransaction::query()->find($txId);
+                    if ($paid) {
+                        $receipts->notifyPayer($paid);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Payment receipt email failed', [
+                        'transaction_id' => $txId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
+
             return $tx;
         });
     }
@@ -107,7 +299,9 @@ class PaymentFulfillmentService
         int $amount,
         string $currency,
         array $metadata,
-        string $callbackUrl
+        string $callbackUrl,
+        PaymentGatewayContext $gateway,
+        ?int $gatewayJournalId = null,
     ): array {
         $reference = $this->paystack->makeReference();
 
@@ -120,6 +314,8 @@ class PaymentFulfillmentService
             'currency' => $currency,
             'status' => 'pending',
             'provider' => 'paystack',
+            'gateway_mode' => $gateway->mode,
+            'gateway_journal_id' => $gatewayJournalId,
         ]);
 
         $data = $this->paystack->initialize(
@@ -127,10 +323,11 @@ class PaymentFulfillmentService
             $amount,
             $reference,
             $metadata,
-            $callbackUrl
+            $callbackUrl,
+            $gateway,
         );
 
-        $tx->provider_payload = ['initialize' => $data];
+        $tx->provider_payload = ['initialize' => $data, 'gateway_mode' => $gateway->mode];
         $tx->save();
 
         return [
@@ -138,6 +335,7 @@ class PaymentFulfillmentService
             'authorization_url' => $data['authorization_url'] ?? null,
             'access_code' => $data['access_code'] ?? null,
             'reference' => $reference,
+            'gateway_mode' => $gateway->mode,
         ];
     }
 
@@ -169,6 +367,51 @@ class PaymentFulfillmentService
                 'starts_at' => now(),
                 'ends_at' => now()->addDays($plan->duration_days),
             ]);
+
+            return;
+        }
+
+        if ($tx->payable_type === Journal::class) {
+            $journal = Journal::query()->findOrFail($tx->payable_id);
+            $journal->markActivationPaid();
+        }
+
+        if ($tx->payable_type === Submission::class) {
+            $submission = Submission::query()->findOrFail($tx->payable_id);
+
+            if ($submission->status === 'fee_pending') {
+                $submission->update([
+                    'status' => 'submitted',
+                    'fee_payment_transaction_id' => $tx->id,
+                ]);
+
+                SubmissionTimeline::query()->create([
+                    'submission_id' => $submission->id,
+                    'user_id' => $tx->user_id,
+                    'event' => 'submitted',
+                    'metadata' => [
+                        'fee_payment_transaction_id' => $tx->id,
+                        'journal_fee_id' => $submission->journal_fee_id,
+                    ],
+                ]);
+            } elseif ($submission->status === 'publication_fee_pending') {
+                $submission->update([
+                    'status' => SubmissionStatus::READY_FOR_PRODUCTION,
+                    'publication_fee_payment_transaction_id' => $tx->id,
+                ]);
+
+                SubmissionTimeline::query()->create([
+                    'submission_id' => $submission->id,
+                    'user_id' => $tx->user_id,
+                    'event' => 'publication_fee_paid',
+                    'metadata' => [
+                        'publication_fee_payment_transaction_id' => $tx->id,
+                        'publication_journal_fee_id' => $submission->publication_journal_fee_id,
+                    ],
+                ]);
+
+                $this->production->notifyProductionEditors($submission->fresh(['journal', 'author']));
+            }
         }
     }
 }

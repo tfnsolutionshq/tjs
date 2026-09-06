@@ -3,7 +3,7 @@
     $team = $team ?? $journal->teamMembers();
 @endphp
 
-<section class="jf-card" style="max-width:72rem;margin-top:1rem" id="journal-team">
+<section class="jf-card" style="width:100%;margin-top:1rem" id="journal-team">
     <div class="jf-card__head">
         <h2 class="jf-card__title">Journal team</h2>
         <p class="jf-card__desc">

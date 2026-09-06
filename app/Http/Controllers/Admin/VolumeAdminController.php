@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Journal;
+use App\Models\JournalFee;
 use App\Models\Volume;
+use App\Support\JournalFeePurpose;
 use App\Services\Storage\ArticleStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,11 +23,18 @@ class VolumeAdminController extends Controller
     public function index(Journal $journal): View
     {
         $volumes = $journal->volumes()
-            ->with(['issues' => fn ($q) => $q->orderBy('issue_number')])
+            ->with(['issues' => fn ($q) => $q->with('journalFee')->orderBy('issue_number')])
             ->withCount('issues')
             ->orderByDesc('year')
             ->orderByDesc('volume_number')
             ->get();
+
+        $publicationFees = JournalFee::query()
+            ->where('journal_id', $journal->id)
+            ->active()
+            ->forPurpose(JournalFeePurpose::ARTICLE)
+            ->orderBy('name')
+            ->get(['id', 'name', 'amount', 'currency']);
 
         $stats = [
             'volumes' => $volumes->count(),
@@ -36,7 +45,7 @@ class VolumeAdminController extends Controller
 
         $canMutate = $journal->userMayMutate(auth()->user());
 
-        return view('admin.volumes.index', compact('journal', 'volumes', 'stats', 'canMutate'));
+        return view('admin.volumes.index', compact('journal', 'volumes', 'stats', 'canMutate', 'publicationFees'));
     }
 
     public function store(Request $request, Journal $journal): RedirectResponse
@@ -69,7 +78,7 @@ class VolumeAdminController extends Controller
         ]);
 
         if ($request->hasFile('cover')) {
-            $volume->cover_path = $this->storage->storeVolumeCover($volume, $request->file('cover'));
+            [$volume->cover_path, $volume->cover_disk] = $this->storage->storeVolumeCover($volume, $request->file('cover'));
             $volume->save();
         }
 
@@ -110,7 +119,7 @@ class VolumeAdminController extends Controller
         ]);
 
         if ($request->hasFile('cover')) {
-            $volume->cover_path = $this->storage->storeVolumeCover($volume, $request->file('cover'));
+            [$volume->cover_path, $volume->cover_disk] = $this->storage->storeVolumeCover($volume, $request->file('cover'));
             $volume->save();
         }
 

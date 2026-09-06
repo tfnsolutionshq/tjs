@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SubmissionRevision extends Model
 {
     protected $fillable = [
-        'submission_id', 'uploaded_by', 'revision_number', 'document_path', 'notes',
+        'submission_id', 'uploaded_by', 'revision_number', 'document_path', 'document_disk', 'notes',
     ];
 
     public function submission(): BelongsTo

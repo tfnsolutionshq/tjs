@@ -3,15 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\Storage\ArticleStorage;
+use App\Services\Storage\HybridDisk;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
+    public function __construct(
+        private ArticleStorage $storage,
+        private HybridDisk $disks,
+    ) {
+    }
+
     public function edit(Request $request): View
     {
         $user = $request->user();
@@ -53,16 +60,17 @@ class ProfileController extends Controller
         }
 
         if ($request->boolean('remove_avatar') && $user->avatar_path) {
-            Storage::disk('public')->delete($user->avatar_path);
+            $this->disks->delete($user->avatar_path, HybridDisk::KIND_MEDIA, $user->avatar_disk);
             $user->avatar_path = null;
+            $user->avatar_disk = null;
         }
 
         if ($request->hasFile('avatar')) {
             if ($user->avatar_path) {
-                Storage::disk('public')->delete($user->avatar_path);
+                $this->disks->delete($user->avatar_path, HybridDisk::KIND_MEDIA, $user->avatar_disk);
             }
 
-            $user->avatar_path = $request->file('avatar')->store('avatars/'.$user->id, 'public');
+            [$user->avatar_path, $user->avatar_disk] = $this->storage->storeAvatar($user->id, $request->file('avatar'));
         }
 
         $user->save();
@@ -92,7 +100,7 @@ class ProfileController extends Controller
         Auth::logout();
 
         if ($user->avatar_path) {
-            Storage::disk('public')->deleteDirectory('avatars/'.$user->id);
+            $this->disks->deleteDirectory('avatars/'.$user->id);
         }
 
         $user->delete();

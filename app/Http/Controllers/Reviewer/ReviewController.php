@@ -7,22 +7,31 @@ use App\Models\ReviewerAssignment;
 use App\Models\Submission;
 use App\Models\SubmissionRevision;
 use App\Models\SubmissionTimeline;
+use App\Services\Journal\SubmissionAcceptanceService;
 use App\Support\ReviewType;
+use App\Support\SubmissionStatus;
+use App\Services\Storage\HybridDisk;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReviewController extends Controller
 {
+    public function __construct(
+        private HybridDisk $disks,
+        private SubmissionAcceptanceService $acceptance,
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $assignments = ReviewerAssignment::query()
             ->with(['submission.journal', 'submission.author'])
             ->where('reviewer_id', $request->user()->id)
             ->whereIn('status', ['assigned', 'in_progress'])
+            ->whereHas('submission', fn ($q) => $q->where('status', '!=', SubmissionStatus::FEE_PENDING))
             ->orderBy('priority')
             ->orderBy('due_at')
             ->get();
@@ -61,10 +70,12 @@ class ReviewController extends Controller
     public function download(Request $request, Submission $submission): StreamedResponse
     {
         $this->assertAssigned($request, $submission);
-        abort_unless($submission->document_path && Storage::disk('local')->exists($submission->document_path), 404);
+        abort_unless($submission->document_path, 404);
 
-        return Storage::disk('local')->download(
+        return $this->disks->download(
             $submission->document_path,
+            HybridDisk::KIND_DOCUMENTS,
+            $submission->document_disk,
             basename($submission->document_path)
         );
     }
@@ -73,10 +84,12 @@ class ReviewController extends Controller
     {
         $this->assertAssigned($request, $submission);
         abort_unless((string) $revision->submission_id === (string) $submission->id, 404);
-        abort_unless($revision->document_path && Storage::disk('local')->exists($revision->document_path), 404);
+        abort_unless($revision->document_path, 404);
 
-        return Storage::disk('local')->download(
+        return $this->disks->download(
             $revision->document_path,
+            HybridDisk::KIND_DOCUMENTS,
+            $revision->document_disk,
             basename($revision->document_path)
         );
     }
@@ -106,7 +119,6 @@ class ReviewController extends Controller
             ];
 
             if ($data['decision'] === 'accept') {
-                $updates['status'] = 'approved';
                 $updates['rejection_reason'] = null;
             } elseif ($data['decision'] === 'reject') {
                 $updates['status'] = 'rejected';
@@ -117,6 +129,10 @@ class ReviewController extends Controller
             }
 
             $submission->update($updates);
+
+            if ($data['decision'] === 'accept') {
+                $this->acceptance->recordAcceptance($submission, $request->user()->id);
+            }
 
             ReviewerAssignment::query()
                 ->where('submission_id', $submission->id)
@@ -143,6 +159,12 @@ class ReviewController extends Controller
 
     private function assertAssigned(Request $request, Submission $submission): void
     {
+        abort_if(
+            $submission->blocksEditorialProgress(),
+            422,
+            'This submission is awaiting payment and is not available for review yet.'
+        );
+
         $assigned = ReviewerAssignment::query()
             ->where('submission_id', $submission->id)
             ->where('reviewer_id', $request->user()->id)

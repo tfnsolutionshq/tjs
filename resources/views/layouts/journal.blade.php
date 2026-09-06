@@ -7,13 +7,11 @@
     <title>@yield('title', $journal->title)</title>
     <meta name="description" content="@yield('meta_description', $journal->subtitle ?: Str::limit(strip_tags($journal->description), 155))">
     <link rel="canonical" href="@yield('canonical', url()->current())">
-    @if($journal->logoUrl())
-        <link rel="icon" href="{{ $journal->logoUrl() }}" sizes="any">
-        <link rel="apple-touch-icon" href="{{ $journal->logoUrl() }}">
-        <link rel="shortcut icon" href="{{ $journal->logoUrl() }}">
-    @else
-        <link rel="icon" href="{{ asset('favicon.ico') }}">
-    @endif
+    <link rel="sitemap" type="application/xml" title="{{ $journal->title }}" href="{{ route('sitemap.journal', $journal) }}">
+    <meta name="robots" content="@yield('robots', 'index,follow,max-image-preview:large')">
+    <meta name="application-name" content="{{ $journal->title }}">
+    <meta name="apple-mobile-web-app-title" content="{{ $journal->initials ?: Str::limit($journal->title, 12, '') }}">
+    @include('seo.brand-icons', ['brandJournal' => $journal])
     @yield('seo')
     @stack('meta')
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -87,6 +85,9 @@
             padding: .55rem .9rem; border-radius: .6rem;
             color: var(--j-nav-text) !important; font-size: .84rem; font-weight: 650;
             border: 1px solid color-mix(in srgb, var(--j-nav-text) 18%, transparent);
+        }
+        .j-nav__account--enrol {
+            background: color-mix(in srgb, var(--j-nav-text) 12%, transparent);
         }
         @media (min-width: 480px) {
             .j-nav__account { display: inline-flex; }
@@ -289,7 +290,8 @@
                 @auth
                     <a href="{{ route('dashboard') }}" class="j-nav__account">Dashboard</a>
                 @else
-                    <a href="{{ route('login') }}" class="j-nav__account">Log in</a>
+                    <a href="{{ route('journals.login', $journal) }}" class="j-nav__account">Log In</a>
+                    <a href="{{ route('journals.register', $journal) }}" class="j-nav__account j-nav__account--enrol">Enrol</a>
                 @endauth
             </div>
         </div>
@@ -322,7 +324,8 @@
                 @auth
                     <a href="{{ route('dashboard') }}" @click="navOpen = false">Dashboard</a>
                 @else
-                    <a href="{{ route('login') }}" @click="navOpen = false">Log in</a>
+                    <a href="{{ route('journals.login', $journal) }}" @click="navOpen = false">Log In</a>
+                    <a href="{{ route('journals.register', $journal) }}" @click="navOpen = false">Enrol</a>
                 @endauth
             </div>
         </div>
@@ -368,6 +371,9 @@
             <p>
                 @if($journal->issn)ISSN {{ $journal->issn }} · @endif
                 <a class="j-link" href="{{ route('home') }}">{{ config('tjs.name') }}</a>
+                <span aria-hidden="true"> · </span>
+                Developed by
+                <a class="j-link" href="{{ config('tjs.developer_url') }}" target="_blank" rel="noopener noreferrer">{{ config('tjs.developer_name') }}</a>
             </p>
         </div>
     </footer>

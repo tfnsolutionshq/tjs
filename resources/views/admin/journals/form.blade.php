@@ -21,9 +21,9 @@
 @endphp
 
 <style>
-    .jf { display: grid; gap: 1rem; max-width: 72rem; }
+    .jf { display: grid; gap: 1rem; width: 100%; max-width: none; }
     @media (min-width: 1100px) {
-        .jf { grid-template-columns: minmax(0, 1fr) 17.5rem; align-items: start; gap: 1.15rem; }
+        .jf { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); align-items: start; gap: 1.25rem; }
     }
 
     .jf-main { display: grid; gap: 1rem; min-width: 0; }
@@ -145,16 +145,20 @@
     .jf-switch {
         position: relative; width: 2.55rem; height: 1.45rem; flex-shrink: 0; margin-top: .1rem;
     }
-    .jf-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .jf-switch input {
+        position: absolute; inset: 0; z-index: 2;
+        width: 100%; height: 100%; margin: 0;
+        opacity: 0; cursor: pointer;
+    }
     .jf-switch__track {
         position: absolute; inset: 0; border-radius: 999px; background: #cbd5e1;
-        transition: background .18s ease;
+        transition: background .18s ease; pointer-events: none;
     }
     .jf-switch__thumb {
         position: absolute; top: .15rem; left: .15rem;
         width: 1.15rem; height: 1.15rem; border-radius: 999px; background: #fff;
         box-shadow: 0 1px 3px rgba(15,23,42,.2);
-        transition: transform .18s ease;
+        transition: transform .18s ease; pointer-events: none;
     }
     .jf-switch input:checked + .jf-switch__track { background: #2563eb; }
     .jf-switch input:checked + .jf-switch__track .jf-switch__thumb { transform: translateX(1.1rem); }
@@ -691,7 +695,13 @@
 
                     <div class="jf-field jf-span-2">
                         <x-form-label for="description" field="journal.description">Description</x-form-label>
-                        <textarea id="description" name="description" rows="4" class="jf-textarea" placeholder="What this journal publishes…">{{ old('description', $journal->description ?? '') }}</textarea>
+                        <x-rich-text
+                            id="description"
+                            name="description"
+                            :value="old('description', $journal->description ?? '')"
+                            placeholder="What this journal publishes…"
+                            :rows="5"
+                        />
                     </div>
                 </div>
             </div>
@@ -998,14 +1008,16 @@
     </div>
 
     <aside class="jf-side">
-        <section class="jf-card">
+        <section class="jf-card" id="journal-visibility">
             <div class="jf-card__head">
                 <h2 class="jf-card__title">Visibility</h2>
                 <p class="jf-card__desc">Control listing and homepage placement.</p>
             </div>
             <div class="jf-card__body">
                 <input type="hidden" name="is_active" value="0">
-                <input type="hidden" name="is_featured" value="0">
+                @unless(isset($manageJournal))
+                    <input type="hidden" name="is_featured" value="0">
+                @endunless
                 <label class="jf-toggle">
                     <span class="jf-toggle__copy">
                         <span class="jf-toggle__label">Active <x-field-helper :text="\App\Support\FormHelp::get('journal.status')" /></span>
@@ -1015,16 +1027,51 @@
                         <span class="jf-switch__track"><span class="jf-switch__thumb"></span></span>
                     </span>
                 </label>
-                <label class="jf-toggle">
-                    <span class="jf-toggle__copy">
-                        <span class="jf-toggle__label">Featured <x-field-helper :text="\App\Support\FormHelp::get('journal.featured')" /></span>
-                        <span class="jf-toggle__hint">Highlight on the homepage.</span>
-                    </span>
-                    <span class="jf-switch">
-                        <input type="checkbox" name="is_featured" value="1" @checked($isFeatured)>
-                        <span class="jf-switch__track"><span class="jf-switch__thumb"></span></span>
-                    </span>
-                </label>
+                @if(isset($manageJournal))
+                    <div style="margin-top:.85rem;padding:.85rem 1rem;border:1px solid var(--line);border-radius:.85rem;background:#f8fafc">
+                        <p style="margin:0;font-size:.88rem;font-weight:700;color:var(--ink)">Homepage featured placement</p>
+                        @if($journal->is_featured)
+                            <p style="margin:.35rem 0 0;font-size:.8rem;color:#15803d;font-weight:600">This journal is featured on the platform homepage.</p>
+                        @elseif($journal->featured_requested_at && $journal->featured_requested_at->greaterThan(now()->subDays(7)))
+                            <p style="margin:.35rem 0 0;font-size:.8rem;color:var(--muted)">
+                                Featured request sent {{ $journal->featured_requested_at->diffForHumans() }}. The platform team will respond soon.
+                            </p>
+                        @else
+                            <p style="margin:.35rem 0 .65rem;font-size:.8rem;color:var(--muted);line-height:1.45">
+                                Only platform administrators can mark a journal as featured. Send a request and we will email them.
+                            </p>
+                            @if($canMutate ?? true)
+                                <button type="submit" form="featured-request-form" class="admin-btn admin-btn-secondary" style="padding:.45rem .75rem;font-size:.78rem">
+                                    Request featured on homepage
+                                </button>
+                            @endif
+                        @endif
+                    </div>
+                @else
+                    <label class="jf-toggle">
+                        <span class="jf-toggle__copy">
+                            <span class="jf-toggle__label">Featured <x-field-helper :text="\App\Support\FormHelp::get('journal.featured')" /></span>
+                            <span class="jf-toggle__hint">Highlight on the homepage.</span>
+                        </span>
+                        <span class="jf-switch">
+                            <input type="checkbox" name="is_featured" value="1" @checked($isFeatured)>
+                            <span class="jf-switch__track"><span class="jf-switch__thumb"></span></span>
+                        </span>
+                    </label>
+                @endif
+                @unless(isset($manageJournal))
+                    <input type="hidden" name="personal_gateway_allowed" value="0">
+                    <label class="jf-toggle">
+                        <span class="jf-toggle__copy">
+                            <span class="jf-toggle__label">Allow personal Paystack gateway</span>
+                            <span class="jf-toggle__hint">When off, income falls back to platform split (if configured) or sales stop.</span>
+                        </span>
+                        <span class="jf-switch">
+                            <input type="checkbox" name="personal_gateway_allowed" value="1" @checked(old('personal_gateway_allowed', $journal->exists ? ($journal->personal_gateway_allowed ? '1' : '0') : '1') === '1')>
+                            <span class="jf-switch__track"><span class="jf-switch__thumb"></span></span>
+                        </span>
+                    </label>
+                @endunless
             </div>
             @isset($manageJournal)
                 <div class="jf-card__body" style="border-top:1px solid var(--line);padding-top:1rem">
@@ -1078,3 +1125,11 @@
         @endif
     </aside>
 </form>
+
+@isset($manageJournal)
+    @if(! $journal->is_featured && (! $journal->featured_requested_at || ! $journal->featured_requested_at->greaterThan(now()->subDays(7))))
+        <form id="featured-request-form" method="POST" action="{{ route('journal.manage.settings.featured-request', $manageJournal) }}" hidden>
+            @csrf
+        </form>
+    @endif
+@endisset

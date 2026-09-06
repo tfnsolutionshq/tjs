@@ -20,7 +20,7 @@
         margin-bottom: 1rem;
     }
     @media (min-width: 960px) {
-        .aj-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .aj-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     }
     .aj-stat {
         position: relative;
@@ -219,6 +219,7 @@
         padding: .28rem .55rem; border-radius: 999px;
     }
     .aj-badge--featured { background: #fef3c7; color: #b45309; }
+    .aj-badge--featured-request { background: #ede9fe; color: #6d28d9; }
     .aj-badge--active { background: #dcfce7; color: #15803d; }
     .aj-badge--inactive { background: #f1f5f9; color: #64748b; }
     .aj-card__desc {
@@ -232,23 +233,23 @@
     .aj-card__main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
     .aj-grid.is-list .aj-card__main { display: block; }
     .aj-card__metrics {
-        display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem;
+        display: grid; grid-template-columns: 1fr; gap: .55rem;
         margin-top: 1rem; padding-top: .95rem; border-top: 1px solid var(--line);
     }
     .aj-grid.is-list .aj-card__metrics { display: none; }
     .aj-metric {
-        display: flex; align-items: center; gap: .55rem;
-        background: #f8fafc; border-radius: .75rem; padding: .6rem .6rem;
-        min-height: 3.1rem;
+        display: flex; align-items: center; gap: .6rem;
+        background: #f8fafc; border: 1px solid #eef2f7; border-radius: .75rem; padding: .65rem .7rem;
+        min-height: 3.25rem;
     }
     .aj-metric__icon {
-        width: 1.75rem; height: 1.75rem; border-radius: .5rem; flex-shrink: 0;
+        width: 2rem; height: 2rem; border-radius: .6rem; flex-shrink: 0;
         display: flex !important; align-items: center; justify-content: center;
-        background: #e2e8f0; color: #64748b;
         margin: 0 !important;
     }
+    .aj-metric__icon--articles { background: #dbeafe; color: #1d4ed8; }
     .aj-metric__icon svg {
-        width: .9rem; height: .9rem; display: block; flex-shrink: 0;
+        width: 1.05rem; height: 1.05rem; display: block; flex-shrink: 0;
     }
     .aj-metric__text {
         display: flex; flex-direction: column; justify-content: center;
@@ -264,7 +265,7 @@
         line-height: 1;
     }
     .aj-card__actions {
-        display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .45rem;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem;
         margin-top: 1rem;
     }
     .aj-grid.is-list .aj-card__actions {
@@ -273,14 +274,24 @@
     }
     .aj-card__actions .admin-btn,
     .aj-card__actions .admin-chip {
-        width: 100%; justify-content: center; padding: .58rem .5rem; font-size: .8rem;
+        width: 100%; justify-content: center; gap: .4rem; padding: .58rem .45rem; font-size: .78rem;
+        font-weight: 650;
     }
     .aj-grid.is-list .aj-card__actions .admin-btn,
     .aj-grid.is-list .aj-card__actions .admin-chip {
         padding: .42rem .45rem; font-size: .72rem;
     }
-    .aj-card__actions svg { width: .9rem; height: .9rem; }
-    .aj-grid.is-list .aj-card__actions svg { display: none; }
+    .aj-card__actions .aj-action-icon {
+        width: 1.85rem; height: 1.85rem; border-radius: .45rem;
+        display: inline-flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+    .aj-card__actions .aj-action-icon--manage { background: #e0f2fe; color: #0369a1; }
+    .aj-card__actions .aj-action-icon--articles { background: #dbeafe; color: #1d4ed8; }
+    .aj-card__actions .aj-action-icon--users { background: #f1f5f9; color: #475569; }
+    .aj-card__actions .aj-action-icon--featured { background: #fef3c7; color: #b45309; }
+    .aj-card__actions .aj-action-icon svg { width: .95rem; height: .95rem; }
+    .aj-grid.is-list .aj-card__actions .aj-action-icon { display: none; }
     .aj-list-stats {
         display: none; margin-top: .45rem; font-size: .72rem; color: var(--muted); font-weight: 600;
         gap: .55rem; flex-wrap: wrap;
@@ -402,11 +413,56 @@
     }
 
     @media (max-width: 720px) {
+        .aj-stats {
+            display: flex;
+            overflow-x: auto;
+            gap: .65rem;
+            padding-bottom: .15rem;
+            margin-bottom: .85rem;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .aj-stats::-webkit-scrollbar { height: 0; }
+        .aj-stat {
+            flex: 0 0 78%;
+            max-width: 78%;
+            scroll-snap-align: start;
+            padding: .85rem .9rem;
+        }
+        .aj-stat__hint { font-size: .7rem; max-width: 100%; }
+        .aj-toolbar {
+            padding: .75rem .8rem;
+            gap: .65rem;
+        }
+        .aj-filters {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: .1rem;
+            width: 100%;
+        }
+        .aj-filters .aj-chip { flex-shrink: 0; }
+        .aj-view-toggle {
+            margin-left: 0;
+            width: 100%;
+            justify-content: center;
+        }
         .aj-grid.is-list .aj-card__body { flex-direction: column; }
         .aj-grid.is-list .aj-card__actions {
-            width: 100%; flex-direction: row; display: grid; grid-template-columns: 1fr 1fr 1fr;
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
         }
-        .aj-view-toggle { margin-left: 0; }
+        .aj-grid.is-list .aj-card__actions .aj-action-icon { display: inline-flex; }
+        .aj-card__actions {
+            grid-template-columns: 1fr;
+        }
+        .aj-card__actions .admin-btn {
+            justify-content: flex-start;
+            padding: .62rem .75rem;
+        }
+        .aj-card__title { font-size: .98rem; }
+        .aj-card__body { padding: .95rem .95rem 1rem; }
     }
 </style>
 
@@ -560,6 +616,15 @@
         <p class="aj-stat__value">{{ number_format($stats['featured']) }}</p>
         <p class="aj-stat__hint">Highlighted on the homepage</p>
     </a>
+    <a href="{{ route('admin.journals.index', array_filter(['q' => $q, 'status' => 'featured_requests', 'per_page' => $perPage])) }}"
+       class="aj-stat {{ $currentStatus === 'featured_requests' ? 'is-active' : '' }}" style="--aj-accent:#7c3aed;--aj-soft:#ede9fe">
+        <span class="aj-stat__icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4l2.2 4.5 5 .7-3.6 3.5.9 5L12 15.8 7.5 17.7l.9-5L4.8 9.2l5-.7L12 4z"/><path stroke-linecap="round" d="M12 8v4M12 16h.01"/></svg>
+        </span>
+        <p class="aj-stat__label">Featured requests</p>
+        <p class="aj-stat__value">{{ number_format($stats['featured_requests']) }}</p>
+        <p class="aj-stat__hint">Awaiting platform approval</p>
+    </a>
     <a href="{{ route('admin.journals.index', array_filter(['q' => $q, 'status' => 'inactive', 'per_page' => $perPage])) }}"
        class="aj-stat {{ $currentStatus === 'inactive' ? 'is-active' : '' }}" style="--aj-accent:#64748b;--aj-soft:#e2e8f0">
         <span class="aj-stat__icon">
@@ -600,6 +665,7 @@
         <button type="button" class="aj-chip" :class="{ 'is-active': !status }" @click="setStatus(null)">All</button>
         <button type="button" class="aj-chip" :class="{ 'is-active': status === 'active' }" @click="setStatus('active')">Active</button>
         <button type="button" class="aj-chip" :class="{ 'is-active': status === 'featured' }" @click="setStatus('featured')">Featured</button>
+        <button type="button" class="aj-chip" :class="{ 'is-active': status === 'featured_requests' }" @click="setStatus('featured_requests')">Featured requests</button>
         <button type="button" class="aj-chip" :class="{ 'is-active': status === 'inactive' }" @click="setStatus('inactive')">Inactive</button>
         <div class="aj-view-toggle" role="group" aria-label="Layout">
             <button
@@ -671,9 +737,9 @@
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                                         </button>
                                         <div class="aj-dropdown__menu">
-                                            <a href="{{ route('journals.show', $journal) }}" target="_blank" rel="noopener">Preview</a>
-                                            <a href="{{ route('admin.journals.edit', $journal) }}">Edit</a>
-                                            <a href="{{ route('admin.volumes.index', $journal) }}">Volumes</a>
+                                            <a href="{{ route('journal.manage.dashboard', $journal) }}">Manage</a>
+                                            <a href="{{ route('admin.articles.index', ['journal_id' => $journal->id]) }}">Articles</a>
+                                            <a href="{{ route('admin.journals.edit', $journal) }}#journal-team">Users</a>
                                             <button
                                                 type="button"
                                                 class="is-danger"
@@ -692,6 +758,9 @@
                                 </p>
                                 <div class="aj-card__badges">
                                     @if($journal->is_featured)<span class="aj-badge aj-badge--featured">Featured</span>@endif
+                                    @if(! $journal->is_featured && $journal->featured_requested_at)
+                                        <span class="aj-badge aj-badge--featured-request">Featured request</span>
+                                    @endif
                                     @if($journal->is_active)
                                         <span class="aj-badge aj-badge--active">Active</span>
                                     @else
@@ -700,8 +769,6 @@
                                 </div>
                                 <p class="aj-list-stats">
                                     <span>{{ number_format($journal->articles_count) }} articles</span>
-                                    <span>{{ number_format($journal->volumes_count) }} volumes</span>
-                                    <span>{{ number_format($journal->submissions_count) }} submissions</span>
                                 </p>
                             </div>
                         </div>
@@ -712,47 +779,50 @@
 
                         <div class="aj-card__metrics">
                             <div class="aj-metric">
-                                <div class="aj-metric__icon" aria-hidden="true">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19"/></svg>
+                                <div class="aj-metric__icon aj-metric__icon--articles" aria-hidden="true">
+                                    <x-admin.journal-icon name="articles" class="h-4 w-4" />
                                 </div>
                                 <div class="aj-metric__text">
                                     <strong>{{ number_format($journal->articles_count) }}</strong>
                                     <span>Articles</span>
                                 </div>
                             </div>
-                            <div class="aj-metric">
-                                <div class="aj-metric__icon" aria-hidden="true">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5l8 4-8 4-8-4 8-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 12.5l8 4 8-4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5l8 4 8-4"/></svg>
-                                </div>
-                                <div class="aj-metric__text">
-                                    <strong>{{ number_format($journal->volumes_count) }}</strong>
-                                    <span>Volumes</span>
-                                </div>
-                            </div>
-                            <div class="aj-metric">
-                                <div class="aj-metric__icon" aria-hidden="true">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 12a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4.2 19a7.8 7.8 0 0115.6 0"/></svg>
-                                </div>
-                                <div class="aj-metric__text">
-                                    <strong>{{ number_format($journal->submissions_count) }}</strong>
-                                    <span>Submissions</span>
-                                </div>
-                            </div>
                         </div>
     </div>
 
                     <div class="aj-card__actions">
-                        <a href="{{ route('journals.show', $journal) }}" target="_blank" rel="noopener" class="admin-chip">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></svg>
-                            Preview
+                        @if(! $journal->is_featured && $journal->featured_requested_at)
+                            <form method="POST" action="{{ route('admin.journals.featured.approve', $journal) }}">
+                                @csrf
+                                <button type="submit" class="admin-btn admin-btn-primary" style="width:100%">
+                                    <span class="aj-action-icon aj-action-icon--featured" aria-hidden="true">
+                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4l2.2 4.5 5 .7-3.6 3.5.9 5L12 15.8 7.5 17.7l.9-5L4.8 9.2l5-.7L12 4z"/></svg>
+                                    </span>
+                                    Approve featured
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.journals.featured.dismiss', $journal) }}">
+                                @csrf
+                                <button type="submit" class="admin-btn admin-btn-secondary" style="width:100%">Dismiss</button>
+                            </form>
+                        @endif
+                        <a href="{{ route('journal.manage.dashboard', $journal) }}" class="admin-btn admin-btn-secondary">
+                            <span class="aj-action-icon aj-action-icon--manage" aria-hidden="true">
+                                <x-admin.journal-icon name="manage" />
+                            </span>
+                            Manage
                         </a>
-                        <a href="{{ route('admin.volumes.index', $journal) }}" class="admin-btn admin-btn-secondary">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5l8 4-8 4-8-4 8-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 12.5l8 4 8-4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5l8 4 8-4"/></svg>
-                            Volumes
+                        <a href="{{ route('admin.articles.index', ['journal_id' => $journal->id]) }}" class="admin-btn admin-btn-secondary">
+                            <span class="aj-action-icon aj-action-icon--articles" aria-hidden="true">
+                                <x-admin.journal-icon name="articles" />
+                            </span>
+                            Articles
                         </a>
-                        <a href="{{ route('admin.journals.edit', $journal) }}" class="admin-btn admin-btn-primary">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M14.8 8.2l1 1-5.3 5.3H9.5v-1.5l5.3-5.3z"/><path stroke-linecap="round" d="M5 19h14"/></svg>
-                            Edit
+                        <a href="{{ route('admin.journals.edit', $journal) }}#journal-team" class="admin-btn admin-btn-secondary">
+                            <span class="aj-action-icon aj-action-icon--users" aria-hidden="true">
+                                <x-admin.journal-icon name="users" />
+                            </span>
+                            Users
                         </a>
                     </div>
                 </div>

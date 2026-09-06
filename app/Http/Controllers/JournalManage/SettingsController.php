@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Journal;
 use App\Services\Journal\CategoryService;
+use App\Services\Journal\FeaturedJournalRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ class SettingsController extends Controller
     public function __construct(
         private PlatformJournalAdminController $platform,
         private CategoryService $categories,
+        private FeaturedJournalRequestService $featuredRequests,
     ) {
     }
 
@@ -52,6 +54,19 @@ class SettingsController extends Controller
         return redirect()
             ->route('journal.manage.settings.edit', $journal)
             ->with('status', 'Journal settings saved.');
+    }
+
+    public function requestFeatured(Request $request, Journal $journal): RedirectResponse
+    {
+        abort_unless($journal->userMayMutate($request->user()), 403);
+
+        try {
+            $this->featuredRequests->request($journal, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', 'Featured request sent to the platform administrators.');
     }
 
     public function storeCategory(Request $request, Journal $journal): RedirectResponse

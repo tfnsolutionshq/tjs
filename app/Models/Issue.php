@@ -5,13 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 class Issue extends Model
 {
     protected $fillable = [
         'volume_id', 'issue_number', 'title', 'period_start', 'period_end',
-        'cover_path', 'status',
+        'cover_path', 'cover_disk', 'status', 'journal_fee_id',
     ];
 
     protected function casts(): array
@@ -25,6 +24,18 @@ class Issue extends Model
     public function volume(): BelongsTo
     {
         return $this->belongsTo(Volume::class);
+    }
+
+    public function journalFee(): BelongsTo
+    {
+        return $this->belongsTo(JournalFee::class);
+    }
+
+    public function requiresPublicationPayment(): bool
+    {
+        $fee = $this->relationLoaded('journalFee') ? $this->journalFee : $this->journalFee()->first();
+
+        return $fee && $fee->is_active && (int) $fee->amount >= 1;
     }
 
     public function articles(): HasMany
@@ -57,8 +68,11 @@ class Issue extends Model
     public function coverUrl(): ?string
     {
         if ($this->cover_path) {
-            if (Storage::disk('public')->exists($this->cover_path)) {
-                return Storage::disk('public')->url($this->cover_path);
+            $url = app(\App\Services\Storage\HybridDisk::class)
+                ->url($this->cover_path, \App\Services\Storage\HybridDisk::KIND_MEDIA, $this->cover_disk);
+
+            if ($url) {
+                return $url;
             }
 
             $journal = $this->volume?->journal;

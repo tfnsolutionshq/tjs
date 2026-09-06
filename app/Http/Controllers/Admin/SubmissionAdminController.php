@@ -12,6 +12,7 @@ use App\Models\SubmissionTimeline;
 use App\Models\User;
 use App\Support\Licenses;
 use App\Support\ReviewType;
+use App\Support\SubmissionStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,11 +33,16 @@ class SubmissionAdminController extends Controller
         }
 
         $allowedStatuses = [
+            'fee_pending',
             'submitted',
             'under_review',
             'revision_requested',
             'resubmitted',
-            'approved',
+            'publication_fee_pending',
+            'ready_for_production',
+            'in_production',
+            'ready_to_publish',
+            'published',
             'rejected',
         ];
         if ($status !== null && ! in_array($status, $allowedStatuses, true)) {
@@ -61,11 +67,15 @@ class SubmissionAdminController extends Controller
 
         $stats = [
             'total' => $scoped()->count(),
+            'fee_pending' => $scoped()->where('status', SubmissionStatus::FEE_PENDING)->count(),
             'submitted' => $scoped()->where('status', 'submitted')->count(),
             'under_review' => $scoped()->where('status', 'under_review')->count(),
             'revision_requested' => $scoped()->where('status', 'revision_requested')->count(),
             'resubmitted' => $scoped()->where('status', 'resubmitted')->count(),
-            'approved' => $scoped()->where('status', 'approved')->count(),
+            'approved' => $scoped()->whereIn('status', array_merge(
+                \App\Support\SubmissionStatus::productionQueueStatuses(),
+                [\App\Support\SubmissionStatus::PUBLICATION_FEE_PENDING]
+            ))->count(),
             'rejected' => $scoped()->where('status', 'rejected')->count(),
         ];
 
@@ -95,10 +105,15 @@ class SubmissionAdminController extends Controller
     {
         $submission->load([
             'journal',
+            'journalFee',
             'issue.volume',
             'announcement',
             'author',
             'reviewer',
+            'publicationJournalFee',
+            'productionFiles.uploader',
+            'productionAssignee',
+            'productionCompleter',
             'assignments.reviewer',
             'timelines.user',
             'revisions.uploader',
@@ -126,6 +141,12 @@ class SubmissionAdminController extends Controller
 
     public function updateReviewType(Request $request, Submission $submission): RedirectResponse
     {
+        abort_if(
+            $submission->blocksEditorialProgress(),
+            422,
+            'This submission is awaiting payment. Editorial actions are unavailable until the author pays the submission fee.'
+        );
+
         $data = $request->validate([
             'review_type' => ReviewType::requiredRule(),
         ]);
@@ -157,6 +178,12 @@ class SubmissionAdminController extends Controller
 
     public function assignReviewer(Request $request, Submission $submission): RedirectResponse
     {
+        abort_if(
+            $submission->blocksEditorialProgress(),
+            422,
+            'This submission is awaiting payment. Assign a reviewer after the author pays the submission fee.'
+        );
+
         $data = $request->validate([
             'reviewer_id' => ['required', 'exists:users,id'],
             'priority' => ['nullable', 'integer', 'min:1', 'max:5'],
@@ -201,7 +228,22 @@ class SubmissionAdminController extends Controller
 
     public function publishToIssue(Request $request, Submission $submission): RedirectResponse
     {
-        abort_unless($submission->status === 'approved', 422, 'Only approved submissions can be published.');
+        $submission->loadMissing('productionFiles');
+
+        abort_unless(
+            in_array($submission->status, [SubmissionStatus::READY_TO_PUBLISH, SubmissionStatus::APPROVED], true),
+            422,
+            'Only manuscripts ready for publication can be published.'
+        );
+
+        abort_unless(
+            $submission->hasProductionDocument(),
+            422,
+            'A final production document must be uploaded and production completed before this manuscript can be published.'
+        );
+
+        $productionFile = $submission->currentProductionFile();
+        abort_unless($productionFile, 422, 'Production document is missing.');
 
         $data = $request->validate([
             'issue_id' => ['required', 'exists:issues,id'],
@@ -222,7 +264,7 @@ class SubmissionAdminController extends Controller
             abort_unless((int) $issue->id === (int) $submission->issue_id, 422, 'Approved submissions must be published to their target issue.');
         }
 
-        $article = DB::transaction(function () use ($submission, $issue, $data) {
+        $article = DB::transaction(function () use ($request, $submission, $issue, $data, $productionFile) {
             $slugBase = $data['slug'] ?? Str::slug($submission->title);
             $slug = $this->uniqueSlug((int) $submission->journal_id, $slugBase !== '' ? $slugBase : 'article', $submission->id);
 
@@ -242,11 +284,14 @@ class SubmissionAdminController extends Controller
                     'license' => ! empty($data['license']) ? Licenses::normalize($data['license']) : null,
                     'page_range' => $data['page_range'] ?? null,
                     'visibility' => $data['visibility'] ?? 'open',
-                    'document_path' => $submission->document_path,
+                    'document_path' => $productionFile->document_path,
+                    'document_disk' => $productionFile->document_disk,
                     'status' => 'published',
                     'published_at' => now(),
                 ]
             );
+
+            $submission->update(['status' => SubmissionStatus::PUBLISHED]);
 
             $article->authors()->delete();
             $submission->loadMissing('author');
@@ -278,11 +323,14 @@ class SubmissionAdminController extends Controller
                 'metadata' => [
                     'issue_id' => $issue->id,
                     'article_id' => $article->id,
+                    'production_file_id' => $productionFile->id,
                 ],
             ]);
 
             return $article;
         });
+
+        app(\App\Services\Doi\DoiDepositService::class)->maybeAutoDeposit($article->fresh(), $request->user());
 
         $manageJournal = $request->attributes->get('manage_journal');
         if ($manageJournal instanceof Journal) {

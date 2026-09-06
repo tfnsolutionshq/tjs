@@ -15,7 +15,7 @@ class HomeController extends Controller
     public function __invoke(): View
     {
         $journals = Journal::query()
-            ->where('is_active', true)
+            ->listed()
             ->orderByDesc('is_featured')
             ->orderBy('title')
             ->get();

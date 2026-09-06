@@ -7,18 +7,27 @@ use App\Models\Issue;
 use App\Models\Journal;
 use App\Models\User;
 use App\Models\JournalAnnouncement;
+use App\Services\Journal\JournalFeeResolver;
 use App\Services\Journal\ReviewerRequestService;
+use App\Services\Journal\JournalEnrollmentService;
+use App\Support\JournalAuth;
 use App\Support\ListLayout;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class JournalController extends Controller
 {
+    public function __construct(
+        private JournalFeeResolver $fees,
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $layout = ListLayout::fromRequest($request);
         $journals = Journal::query()
-            ->where('is_active', true)
+            ->listed()
             ->orderBy('title')
             ->paginate(12)
             ->withQueryString();
@@ -28,7 +37,7 @@ class JournalController extends Controller
 
     public function show(Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $currentIssue = Issue::query()
             ->where('status', 'published')
@@ -42,7 +51,7 @@ class JournalController extends Controller
 
     public function archive(Request $request, Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $layout = ListLayout::fromRequest($request);
 
@@ -65,14 +74,14 @@ class JournalController extends Controller
 
     public function about(Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         return view('public.journals.about', compact('journal'));
     }
 
     public function editorialBoard(Request $request, Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $layout = ListLayout::fromRequest($request);
         $members = $journal->editorialBoard()->paginate(12)->withQueryString();
@@ -82,7 +91,7 @@ class JournalController extends Controller
 
     public function reviewers(Request $request, Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $layout = ListLayout::fromRequest($request);
 
@@ -105,7 +114,7 @@ class JournalController extends Controller
 
     public function browse(Request $request, Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $layout = ListLayout::fromRequest($request, ListLayout::LIST);
 
@@ -149,7 +158,7 @@ class JournalController extends Controller
 
     public function issue(Request $request, Journal $journal, Issue $issue): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
         abort_unless($issue->volume && (int) $issue->volume->journal_id === (int) $journal->id, 404);
         abort_unless($issue->isPublished() && $issue->volume->isPublished(), 404);
 
@@ -176,7 +185,7 @@ class JournalController extends Controller
 
     public function announcements(Request $request, Journal $journal): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
 
         $layout = ListLayout::fromRequest($request);
 
@@ -193,11 +202,46 @@ class JournalController extends Controller
 
     public function announcement(Journal $journal, JournalAnnouncement $announcement): View
     {
-        abort_unless($journal->is_active, 404);
+        abort_unless($journal->isListed(), 404);
         abort_unless((int) $announcement->journal_id === (int) $journal->id && $announcement->is_published, 404);
 
         $announcement->load(['issue.volume', 'journal']);
 
-        return view('public.journals.announcement', compact('journal', 'announcement'));
+        $submissionFees = collect();
+        $publicationFees = collect();
+        if ($announcement->isCallForSubmissions()) {
+            $journalId = (int) $journal->id;
+            $submissionFees = collect($this->fees->submissionFeesByJournalIds([$journalId])[$journalId] ?? []);
+            $publicationFees = collect($this->fees->publicationFeesByJournalIds([$journalId])[$journalId] ?? []);
+        }
+
+        return view('public.journals.announcement', compact(
+            'journal',
+            'announcement',
+            'submissionFees',
+            'publicationFees',
+        ));
+    }
+
+    public function join(Request $request, Journal $journal, JournalEnrollmentService $enrollment): RedirectResponse
+    {
+        JournalAuth::ensureActive($journal);
+
+        $user = $request->user();
+        $paidPlan = $enrollment->pendingPaidPlanForUser($user, (int) $journal->id);
+
+        if ($paidPlan) {
+            return redirect()
+                ->route('memberships.checkout', $paidPlan)
+                ->with('status', 'Complete your membership payment to access members-only content for this journal.');
+        }
+
+        $membership = $enrollment->ensureJournalAccess($user, $journal);
+
+        return redirect()
+            ->back()
+            ->with('status', $membership
+                ? 'You are now a member of '.$journal->title.'.'
+                : 'You already have access to this journal.');
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Journal;
 use App\Models\Submission;
+use App\Services\Journal\FeaturedJournalRequestService;
 use App\Support\PlatformSettings;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -28,6 +30,12 @@ class AppServiceProvider extends ServiceProvider
                 'adminPendingSubmissions',
                 Submission::query()
                     ->whereIn('status', ['submitted', 'under_review', 'resubmitted', 'revision_requested'])
+                    ->count()
+            );
+            $view->with(
+                'adminFeaturedRequests',
+                app(FeaturedJournalRequestService::class)
+                    ->scopePendingRequests(Journal::query())
                     ->count()
             );
         });
@@ -57,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
             $user = auth()->user();
             $openSubs = 0;
             $openReviews = 0;
+            $openProduction = 0;
 
             if ($user) {
                 $openSubs = Submission::query()
@@ -70,11 +79,26 @@ class AppServiceProvider extends ServiceProvider
                         ->whereIn('status', ['assigned', 'in_progress', 'pending', 'accepted'])
                         ->count();
                 }
+
+                if ($user->canAccessProductionQueue()) {
+                    $journalIds = $user->isAdmin()
+                        ? null
+                        : $user->productionJournals()->pluck('journals.id')->all();
+
+                    $openProduction = Submission::query()
+                        ->when($journalIds !== null, fn ($q) => $q->whereIn('journal_id', $journalIds))
+                        ->whereIn('status', [
+                            \App\Support\SubmissionStatus::READY_FOR_PRODUCTION,
+                            \App\Support\SubmissionStatus::IN_PRODUCTION,
+                        ])
+                        ->count();
+                }
             }
 
             $view->with([
                 'memberOpenSubmissions' => $openSubs,
                 'memberOpenReviews' => $openReviews,
+                'memberOpenProduction' => $openProduction,
             ]);
         });
     }

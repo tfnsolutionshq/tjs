@@ -2,6 +2,15 @@
 
 @section('title', 'Reviewers | '.$journal->title)
 @section('meta_description', 'Peer reviewers who support the editorial process at '.$journal->title.'.')
+@section('canonical', route('journals.reviewers', $journal))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'Reviewers | '.$journal->title,
+        'Peer reviewers who support the editorial process at '.$journal->title.'.',
+        route('journals.reviewers', $journal)
+    )])
+@endsection
 
 @section('content')
 @php

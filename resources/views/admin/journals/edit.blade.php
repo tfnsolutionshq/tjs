@@ -16,7 +16,7 @@
 
 @section('content')
     @if(! empty($platformEditsLocked))
-        <div style="max-width:72rem;margin-bottom:1rem;padding:1rem 1.15rem;border:1px solid #fde68a;border-radius:1rem;background:#fffbeb">
+        <div style="width:100%;margin-bottom:1rem;padding:1rem 1.15rem;border:1px solid #fde68a;border-radius:1rem;background:#fffbeb">
             <p style="margin:0;font-weight:700;color:#92400e">Platform edits are disabled for this journal.</p>
             <p style="margin:.35rem 0 0;font-size:.86rem;color:#a16207">
                 You can still assign a journal team below. A journal admin can re-enable platform edits under
@@ -39,7 +39,7 @@
         'canMutate' => empty($platformEditsLocked),
     ])
 
-    <section class="jf-danger" style="max-width:72rem;margin-top:1rem" x-data="{ open: {{ $errors->has('confirm') ? 'true' : 'false' }} }">
+    <section class="jf-danger" style="width:100%;margin-top:1rem" x-data="{ open: {{ $errors->has('confirm') ? 'true' : 'false' }} }">
         <div style="background:#fff;border:1px solid #fecaca;border-radius:1.05rem;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.035)">
             <div style="padding:1rem 1.15rem;border-bottom:1px solid #fecaca;background:#fef2f2">
                 <h2 style="margin:0;font-size:.95rem;font-weight:800;color:#991b1b">Danger zone</h2>

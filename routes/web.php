@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\ArticleAdminController;
+use App\Http\Controllers\Admin\DoiAdminController;
 use App\Http\Controllers\Admin\EditorialBoardAdminController;
 use App\Http\Controllers\Admin\IssueAdminController;
 use App\Http\Controllers\Admin\JournalAdminController;
@@ -17,29 +18,52 @@ use App\Http\Controllers\CatalogCoverController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Member\ReviewerRequestController;
+use App\Http\Controllers\Member\JournalController as MemberJournalController;
 use App\Http\Controllers\MembershipController;
+use App\Http\Controllers\JournalManage\ActivationController as JournalManageActivationController;
 use App\Http\Controllers\JournalManage\AnnouncementController as JournalManageAnnouncementController;
 use App\Http\Controllers\JournalManage\ArticleController as JournalManageArticleController;
+use App\Http\Controllers\JournalManage\BillingController as JournalManageBillingController;
 use App\Http\Controllers\JournalManage\DashboardController as JournalManageDashboardController;
+use App\Http\Controllers\JournalManage\DoiController as JournalManageDoiController;
 use App\Http\Controllers\JournalManage\EditorialBoardController as JournalManageEditorialBoardController;
+use App\Http\Controllers\JournalManage\JournalFeeController as JournalManageJournalFeeController;
 use App\Http\Controllers\JournalManage\MembershipPlanController as JournalManageMembershipPlanController;
+use App\Http\Controllers\JournalManage\PaymentGatewayController as JournalManagePaymentGatewayController;
 use App\Http\Controllers\JournalManage\SettingsController as JournalManageSettingsController;
 use App\Http\Controllers\JournalManage\SubmissionController as JournalManageSubmissionController;
 use App\Http\Controllers\JournalManage\VolumeController as JournalManageVolumeController;
 use App\Http\Controllers\JournalManage\ReviewerRequestController as JournalManageReviewerRequestController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentReceiptController;
+use App\Http\Controllers\Production\ProductionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Reviewer\ReviewController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/sitemap-site.xml', [SitemapController::class, 'site'])->name('sitemap.site');
 Route::get('/j/{journal}/sitemap.xml', [SitemapController::class, 'journal'])->name('sitemap.journal');
 
 Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
 Route::get('/j/{journal}', [JournalController::class, 'show'])->name('journals.show');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/j/{journal}/login', [AuthenticatedSessionController::class, 'createForJournal'])
+        ->name('journals.login');
+    Route::post('/j/{journal}/login', [AuthenticatedSessionController::class, 'storeForJournal'])
+        ->name('journals.login.store');
+    Route::get('/j/{journal}/register', [RegisteredUserController::class, 'createForJournal'])
+        ->name('journals.register');
+    Route::post('/j/{journal}/register', [RegisteredUserController::class, 'storeForJournal'])
+        ->name('journals.register.store');
+});
+
 Route::get('/j/{journal}/archive', [JournalController::class, 'archive'])->name('journals.archive');
 Route::get('/j/{journal}/about', [JournalController::class, 'about'])->name('journals.about');
 Route::get('/j/{journal}/editorial-board', [JournalController::class, 'editorialBoard'])->name('journals.editorial-board');
@@ -63,12 +87,25 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
     Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
         Route::get('/journals/check-slug', [JournalAdminController::class, 'checkSlug'])->name('journals.check-slug');
+        Route::get('/my/journals/create', [MemberJournalController::class, 'create'])->name('member.journals.create');
+        Route::post('/my/journals', [MemberJournalController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('member.journals.store');
     Route::post('/j/{journal}/reviewer-request', [ReviewerRequestController::class, 'store'])
         ->name('reviewer-requests.store');
+    Route::post('/j/{journal}/join', [JournalController::class, 'join'])
+        ->middleware('throttle:20,1')
+        ->name('journals.join');
     Route::delete('/j/{journal}/reviewer-request', [ReviewerRequestController::class, 'destroy'])
         ->name('reviewer-requests.destroy');
 
     Route::get('/memberships', [MembershipController::class, 'index'])->name('memberships.index');
+    Route::get('/memberships/{plan}/checkout', [PaymentController::class, 'buyMembership'])
+        ->middleware('verified')
+        ->name('memberships.checkout');
+    Route::get('/payments', [PaymentReceiptController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{paymentTransaction}/receipt', [PaymentReceiptController::class, 'download'])
+        ->name('payments.receipt');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -87,6 +124,15 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::post('/submissions', [AuthorSubmissionController::class, 'store'])->name('submissions.store');
         Route::get('/submissions/{submission}', [AuthorSubmissionController::class, 'show'])->name('submissions.show');
         Route::post('/submissions/{submission}/resubmit', [AuthorSubmissionController::class, 'resubmit'])->name('submissions.resubmit');
+        Route::post('/submissions/{submission}/pay-fee', [PaymentController::class, 'buySubmissionFee'])
+            ->middleware('throttle:10,1')
+            ->name('submissions.pay-fee');
+        Route::get('/submissions/{submission}/checkout-publication-fee', [PaymentController::class, 'checkoutPublicationFee'])
+            ->middleware(['signed', 'throttle:10,1'])
+            ->name('submissions.checkout-publication-fee');
+        Route::post('/submissions/{submission}/pay-publication-fee', [PaymentController::class, 'buyPublicationFee'])
+            ->middleware('throttle:10,1')
+            ->name('submissions.pay-publication-fee');
     });
 
     Route::prefix('reviewer')->name('reviewer.')->middleware('review.queue')->group(function () {
@@ -95,6 +141,16 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::get('/reviews/{submission}/download', [ReviewController::class, 'download'])->name('reviews.download');
         Route::get('/reviews/{submission}/revisions/{revision}/download', [ReviewController::class, 'downloadRevision'])->name('reviews.revisions.download');
         Route::post('/reviews/{submission}/decide', [ReviewController::class, 'decide'])->name('reviews.decide');
+    });
+
+    Route::prefix('production')->name('production.queue.')->middleware('production.queue')->group(function () {
+        Route::get('/queue', [ProductionController::class, 'index'])->name('index');
+        Route::get('/queue/{submission}', [ProductionController::class, 'show'])->name('show');
+        Route::post('/queue/{submission}/start', [ProductionController::class, 'start'])->name('start');
+        Route::post('/queue/{submission}/upload', [ProductionController::class, 'upload'])->name('upload');
+        Route::post('/queue/{submission}/complete', [ProductionController::class, 'complete'])->name('complete');
+        Route::get('/queue/{submission}/download-source', [ProductionController::class, 'downloadSource'])->name('download-source');
+        Route::get('/queue/{submission}/download-production', [ProductionController::class, 'downloadProduction'])->name('download-production');
     });
 
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
@@ -106,6 +162,8 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::get('/journals/{journal}/edit', [JournalAdminController::class, 'edit'])->name('journals.edit');
         Route::put('/journals/{journal}', [JournalAdminController::class, 'update'])->name('journals.update');
         Route::delete('/journals/{journal}', [JournalAdminController::class, 'destroy'])->name('journals.destroy');
+        Route::post('/journals/{journal}/featured/approve', [JournalAdminController::class, 'approveFeatured'])->name('journals.featured.approve');
+        Route::post('/journals/{journal}/featured/dismiss', [JournalAdminController::class, 'dismissFeatured'])->name('journals.featured.dismiss');
 
         Route::post('/journals/{journal}/team', [JournalTeamAdminController::class, 'store'])->name('journals.team.store');
         Route::put('/journals/{journal}/team/{user}', [JournalTeamAdminController::class, 'update'])->name('journals.team.update');
@@ -147,6 +205,9 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::put('/settings/categories/{category}', [SettingsAdminController::class, 'updateCategory'])->name('settings.categories.update');
         Route::delete('/settings/categories/{category}', [SettingsAdminController::class, 'destroyCategory'])->name('settings.categories.destroy');
 
+        Route::get('/doi', [DoiAdminController::class, 'index'])->name('doi.index');
+        Route::post('/doi/{journal}/topup', [DoiAdminController::class, 'topUp'])->name('doi.topup');
+
         Route::get('/submissions', [SubmissionAdminController::class, 'index'])->name('submissions.index');
         Route::get('/submissions/{submission}', [SubmissionAdminController::class, 'show'])->name('submissions.show');
         Route::post('/submissions/{submission}/assign-reviewer', [SubmissionAdminController::class, 'assignReviewer'])->name('submissions.assign-reviewer');
@@ -157,8 +218,25 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
     Route::prefix('j/{journal}/manage')->name('journal.manage.')->middleware('journal.manage')->group(function () {
         Route::get('/', JournalManageDashboardController::class)->name('dashboard');
 
+        Route::get('/activation', [JournalManageActivationController::class, 'show'])->name('activation.show');
+        Route::post('/activation/skip', [JournalManageActivationController::class, 'skip'])->name('activation.skip');
+        Route::post('/activation/pay', [PaymentController::class, 'buyJournalActivation'])->name('activation.pay');
+
+        Route::get('/billing', [JournalManageBillingController::class, 'index'])->name('billing.index');
+        Route::get('/billing/export', [JournalManageBillingController::class, 'export'])->name('billing.export');
+
+        Route::get('/fees', [JournalManageJournalFeeController::class, 'index'])->name('fees.index');
+        Route::post('/fees', [JournalManageJournalFeeController::class, 'store'])->name('fees.store');
+        Route::put('/fees/{fee}', [JournalManageJournalFeeController::class, 'update'])->name('fees.update');
+        Route::post('/fees/{fee}/toggle', [JournalManageJournalFeeController::class, 'toggle'])->name('fees.toggle');
+        Route::delete('/fees/{fee}', [JournalManageJournalFeeController::class, 'destroy'])->name('fees.destroy');
+
+        Route::get('/payments/gateway', [JournalManagePaymentGatewayController::class, 'edit'])->name('payments.gateway');
+        Route::put('/payments/gateway', [JournalManagePaymentGatewayController::class, 'update'])->name('payments.gateway.update');
+
         Route::get('/settings', [JournalManageSettingsController::class, 'edit'])->name('settings.edit');
         Route::put('/settings', [JournalManageSettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/featured-request', [JournalManageSettingsController::class, 'requestFeatured'])->name('settings.featured-request');
         Route::post('/settings/categories', [JournalManageSettingsController::class, 'storeCategory'])->name('settings.categories.store');
         Route::put('/settings/categories/{category}', [JournalManageSettingsController::class, 'updateCategory'])->name('settings.categories.update');
         Route::delete('/settings/categories/{category}', [JournalManageSettingsController::class, 'destroyCategory'])->name('settings.categories.destroy');
@@ -182,6 +260,10 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::get('/articles/{article}/edit', [JournalManageArticleController::class, 'edit'])->name('articles.edit');
         Route::put('/articles/{article}', [JournalManageArticleController::class, 'update'])->name('articles.update');
 
+        Route::get('/doi', [JournalManageDoiController::class, 'index'])->name('doi.index');
+        Route::put('/doi/settings', [JournalManageDoiController::class, 'updateSettings'])->name('doi.settings');
+        Route::post('/doi/articles/{article}/deposit', [JournalManageDoiController::class, 'deposit'])->name('doi.deposit');
+
         Route::get('/submissions', [JournalManageSubmissionController::class, 'index'])->name('submissions.index');
         Route::get('/submissions/{submission}', [JournalManageSubmissionController::class, 'show'])->name('submissions.show');
         Route::post('/submissions/{submission}/assign-reviewer', [JournalManageSubmissionController::class, 'assignReviewer'])->name('submissions.assign-reviewer');
@@ -191,6 +273,7 @@ Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('
         Route::get('/announcements', [JournalManageAnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('/announcements/create', [JournalManageAnnouncementController::class, 'create'])->name('announcements.create');
         Route::post('/announcements', [JournalManageAnnouncementController::class, 'store'])->name('announcements.store');
+        Route::post('/announcements/quick-issue', [JournalManageAnnouncementController::class, 'storeQuickIssue'])->name('announcements.quick-issue');
         Route::get('/announcements/{announcement}/edit', [JournalManageAnnouncementController::class, 'edit'])->name('announcements.edit');
         Route::put('/announcements/{announcement}', [JournalManageAnnouncementController::class, 'update'])->name('announcements.update');
         Route::post('/announcements/{announcement}/close', [JournalManageAnnouncementController::class, 'close'])->name('announcements.close');

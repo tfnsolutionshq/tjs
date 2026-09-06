@@ -2,6 +2,15 @@
 
 @section('title', 'Editorial Board | '.$journal->title)
 @section('meta_description', 'Editorial leadership and board members for '.$journal->title.'.')
+@section('canonical', route('journals.editorial-board', $journal))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'Editorial Board | '.$journal->title,
+        'Editorial leadership and board members for '.$journal->title.'.',
+        route('journals.editorial-board', $journal)
+    )])
+@endsection
 
 @section('content')
 @php

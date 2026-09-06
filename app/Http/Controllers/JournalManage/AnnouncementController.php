@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Issue;
 use App\Models\Journal;
 use App\Models\JournalAnnouncement;
+use App\Models\Volume;
 use App\Services\Journal\CallForSubmissionService;
 use App\Support\AnnouncementType;
+use App\Support\SafeHtml;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -40,14 +43,10 @@ class AnnouncementController extends Controller
 
     public function create(Journal $journal): View
     {
-        return view('journal-manage.announcements.form', [
-            'journal' => $journal,
-            'announcement' => new JournalAnnouncement([
-                'type' => AnnouncementType::CALL_FOR_SUBMISSIONS,
-                'is_published' => false,
-            ]),
-            'issues' => $this->issuesForJournal($journal),
-        ]);
+        return view('journal-manage.announcements.form', $this->formData($journal, new JournalAnnouncement([
+            'type' => AnnouncementType::CALL_FOR_SUBMISSIONS,
+            'is_published' => false,
+        ])));
     }
 
     public function store(Request $request, Journal $journal): RedirectResponse
@@ -66,10 +65,61 @@ class AnnouncementController extends Controller
     {
         abort_unless((int) $announcement->journal_id === (int) $journal->id, 404);
 
-        return view('journal-manage.announcements.form', [
-            'journal' => $journal,
-            'announcement' => $announcement,
-            'issues' => $this->issuesForJournal($journal),
+        return view('journal-manage.announcements.form', $this->formData($journal, $announcement));
+    }
+
+    public function storeQuickIssue(Request $request, Journal $journal): JsonResponse
+    {
+        abort_unless($journal->userMayMutate($request->user()), 403);
+
+        $data = $request->validate([
+            'volume_number' => ['required', 'integer', 'min:1'],
+            'year' => ['required', 'integer', 'min:1900', 'max:2100'],
+            'volume_title' => ['nullable', 'string', 'max:255'],
+            'issue_number' => ['required', 'integer', 'min:1'],
+            'issue_title' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $volume = Volume::query()->firstOrCreate(
+            [
+                'journal_id' => $journal->id,
+                'volume_number' => $data['volume_number'],
+                'year' => $data['year'],
+            ],
+            [
+                'title' => $data['volume_title'] ?? null,
+                'status' => 'published',
+            ]
+        );
+
+        if ($data['volume_title'] ?? null) {
+            $volume->fill(['title' => $data['volume_title']])->save();
+        }
+
+        $issueExists = $volume->issues()
+            ->where('issue_number', $data['issue_number'])
+            ->exists();
+
+        if ($issueExists) {
+            return response()->json([
+                'message' => 'That issue number already exists in this volume.',
+                'errors' => ['issue_number' => ['Issue '.$data['issue_number'].' already exists in Vol. '.$volume->volume_number.'.']],
+            ], 422);
+        }
+
+        $issue = $volume->issues()->create([
+            'issue_number' => $data['issue_number'],
+            'title' => $data['issue_title'] ?? null,
+            'status' => 'draft',
+        ]);
+
+        $issue->load('volume');
+
+        return response()->json([
+            'issue' => [
+                'id' => (string) $issue->id,
+                'label' => $issue->label().($issue->title ? ' — '.$issue->title : ''),
+            ],
         ]);
     }
 
@@ -146,6 +196,7 @@ class AnnouncementController extends Controller
         }
 
         $data['is_published'] = $request->boolean('is_published');
+        $data['body'] = SafeHtml::clean($data['body'] ?? null);
 
         return $data;
     }
@@ -157,5 +208,45 @@ class AnnouncementController extends Controller
             ->whereHas('volume', fn ($query) => $query->where('journal_id', $journal->id))
             ->orderByDesc('id')
             ->get();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formData(Journal $journal, JournalAnnouncement $announcement): array
+    {
+        $issues = $this->issuesForJournal($journal);
+
+        return [
+            'journal' => $journal,
+            'announcement' => $announcement,
+            'issues' => $issues,
+            'issuesPayload' => $issues->map(fn (Issue $issue) => [
+                'id' => (string) $issue->id,
+                'label' => $issue->label().($issue->title ? ' — '.$issue->title : ''),
+            ])->values(),
+            'catalogDefaults' => $this->catalogDefaults($journal),
+        ];
+    }
+
+    /**
+     * @return array{volume_number: int, year: int, issue_number: int, volume_title: string, issue_title: string}
+     */
+    private function catalogDefaults(Journal $journal): array
+    {
+        $latestVolume = $journal->volumes()->orderByDesc('volume_number')->orderByDesc('year')->first();
+        $volumeNumber = $latestVolume ? (int) $latestVolume->volume_number : 1;
+        $year = $latestVolume ? (int) $latestVolume->year : (int) date('Y');
+        $issueNumber = $latestVolume
+            ? ((int) $latestVolume->issues()->max('issue_number')) + 1
+            : 1;
+
+        return [
+            'volume_number' => max(1, $volumeNumber),
+            'year' => $year,
+            'issue_number' => max(1, $issueNumber),
+            'volume_title' => '',
+            'issue_title' => '',
+        ];
     }
 }

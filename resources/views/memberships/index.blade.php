@@ -2,7 +2,7 @@
 
 @section('title', 'Memberships | '.config('tjs.name'))
 @section('page_title', 'Memberships')
-@section('page_subtitle', 'Manage your access to members-only journal content')
+@section('page_subtitle', 'Subscribe to journal memberships and manage your access to members-only content')
 
 @section('content')
 @if (session('status'))
@@ -11,7 +11,6 @@
 
 @php
     $activeCount = $activeMemberships->count();
-    $availableCount = $availablePlans->count();
     $hasPlatform = $activeMemberships->contains(fn ($m) => $m->scope === 'platform');
 @endphp
 
@@ -152,6 +151,40 @@
     @media (min-width: 640px) {
         .ms-plan { flex-direction: row; align-items: center; justify-content: space-between; }
     }
+    .ms-plan__main {
+        display: flex;
+        align-items: flex-start;
+        gap: .85rem;
+        flex: 1;
+        min-width: 0;
+    }
+    .ms-plan__logo {
+        width: 2.75rem;
+        height: 2.75rem;
+        object-fit: contain;
+        border-radius: .55rem;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        flex-shrink: 0;
+    }
+    .ms-plan__initials {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: .55rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: .72rem;
+        letter-spacing: .02em;
+        background: #eef4fc;
+        color: #255ea8;
+        flex-shrink: 0;
+    }
+    .ms-plan__body {
+        min-width: 0;
+        flex: 1;
+    }
     .ms-plan__price {
         margin: .45rem 0 0;
         font-size: 1.15rem;
@@ -218,15 +251,103 @@
         color: var(--muted);
         line-height: 1.5;
     }
+    .ms-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin-bottom: .85rem;
+    }
+    .ms-search {
+        position: relative;
+        flex: 1 1 14rem;
+        max-width: 24rem;
+    }
+    .ms-search__input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: .75rem;
+        padding: .62rem .85rem .62rem 2.35rem;
+        font: inherit;
+        font-size: .84rem;
+        background: #fff;
+    }
+    .ms-search__input:focus {
+        outline: none;
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    }
+    .ms-search__icon {
+        position: absolute;
+        left: .75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .ms-browse {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .45rem;
+        margin-bottom: .85rem;
+    }
+    .ms-browse__btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border: 1px solid #dbeafe;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border-radius: 999px;
+        padding: .45rem .8rem;
+        font: inherit;
+        font-size: .78rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .ms-browse__btn:hover { background: #dbeafe; }
+    .ms-browse__btn--ghost {
+        background: #fff;
+        border-color: #e2e8f0;
+        color: #475569;
+    }
+    .ms-browse__btn--ghost:hover { background: #f8fafc; }
+    .ms-badge-featured {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .18rem .48rem;
+        font-size: .62rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .ms-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin-top: .85rem;
+        padding-top: .85rem;
+        border-top: 1px solid var(--line);
+    }
+    .ms-pagination__meta {
+        font-size: .76rem;
+        color: var(--muted);
+    }
 </style>
 
 <div class="ms-stats">
     <div class="ms-stat">
-        <p class="ms-stat__label">Active plans</p>
+        <p class="ms-stat__label">Active memberships</p>
         <p class="ms-stat__value">{{ number_format($activeCount) }}</p>
     </div>
     <div class="ms-stat">
-        <p class="ms-stat__label">Available to buy</p>
+        <p class="ms-stat__label">Available memberships</p>
         <p class="ms-stat__value">{{ number_format($availableCount) }}</p>
     </div>
     <div class="ms-stat">
@@ -287,7 +408,7 @@
     @empty
         <div class="ms-empty">
             <p class="ms-empty__title">No active membership yet</p>
-            <p class="ms-empty__text">Choose a plan below to unlock members-only full text for a journal or the whole platform.</p>
+            <p class="ms-empty__text">Subscribe to a journal membership below to read members-only full text—or choose platform-wide access.</p>
         </div>
     @endforelse
 </section>
@@ -296,7 +417,7 @@
     <section class="ms-section">
         <div class="ms-section__head">
             <h2 class="ms-section__title">Already covered</h2>
-            <p class="ms-section__desc">These plans are included in your current access — no need to pay again.</p>
+            <p class="ms-section__desc">These memberships are already included in your current access — no need to pay again.</p>
         </div>
         <div class="ms-grid ms-grid--2">
             @foreach($coveredPlans as $row)
@@ -319,45 +440,103 @@
 
 <section class="ms-section">
     <div class="ms-section__head">
-        <h2 class="ms-section__title">Plans you can purchase</h2>
-        <p class="ms-section__desc">Add journal access or upgrade to platform-wide membership.</p>
+        <h2 class="ms-section__title">Memberships available</h2>
+        <p class="ms-section__desc">Featured journal memberships appear first. Pay the membership fee set by each journal, or subscribe for platform-wide access.</p>
     </div>
 
-    @forelse($availablePlans as $plan)
-        <article class="ms-plan" style="margin-bottom:.85rem">
-            <div>
-                <div class="ms-plan__features">
-                    <span class="mp-badge mp-badge--{{ $plan->scope }}">{{ $plan->scope }}</span>
-                    @if($plan->journal)
-                        <span class="ms-chip">{{ $plan->journal->title }}</span>
-                    @endif
-                    <span class="ms-chip">{{ $plan->duration_days }} days</span>
-                </div>
-                <h3 class="ms-access__title" style="margin-top:.55rem">{{ $plan->name }}</h3>
-                <p class="ms-plan__price">
-                    ₦{{ number_format($plan->price_amount) }}
-                    <span>/ {{ strtoupper($plan->currency ?: 'NGN') }}</span>
-                </p>
-            </div>
-            <form
-                method="POST"
-                action="{{ route('payments.memberships.buy', $plan) }}"
-                x-data="{ submitting: false }"
-                @submit="if (submitting) { $event.preventDefault() } else { submitting = true }"
-            >
-                @csrf
-                <button type="submit" class="mp-btn mp-btn-primary" style="padding:.62rem 1rem;font-size:.82rem;white-space:nowrap" :disabled="submitting">
-                    <span class="mp-spinner" x-show="submitting" x-cloak></span>
-                    <span x-text="submitting ? 'Redirecting…' : 'Purchase plan'"></span>
-                </button>
-            </form>
-        </article>
-    @empty
-        <div class="ms-empty">
-            <p class="ms-empty__title">You're fully covered</p>
-            <p class="ms-empty__text">Every available plan is already included in your active membership. Check back later for renewals or new journals.</p>
+    @if($availablePlatformPlans->isNotEmpty())
+        <div class="ms-section__head" style="margin-top:.5rem;margin-bottom:.65rem">
+            <h3 class="ms-section__title" style="font-size:.92rem">Platform access</h3>
         </div>
+        @foreach($availablePlatformPlans as $plan)
+            @include('memberships.partials.plan-card', ['plan' => $plan])
+        @endforeach
+    @endif
+
+    @if($availablePlatformPlans->isNotEmpty() && ($availableJournalPlans->isNotEmpty() || $journalPlans->total() > 0))
+        <div class="ms-section__head" style="margin-top:1rem;margin-bottom:.65rem">
+            <h3 class="ms-section__title" style="font-size:.92rem">Journal memberships</h3>
+        </div>
+    @endif
+
+    <form method="GET" action="{{ route('memberships.index') }}" class="ms-toolbar">
+        <label class="ms-search" for="membership-search">
+            <svg class="ms-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/>
+            </svg>
+            <input
+                id="membership-search"
+                type="search"
+                name="q"
+                value="{{ $search }}"
+                class="ms-search__input"
+                placeholder="Search journal memberships…"
+                autocomplete="off"
+            >
+        </label>
+        @if($scope === 'all')
+            <input type="hidden" name="scope" value="all">
+        @endif
+        @if($search !== '')
+            <button type="submit" class="ms-browse__btn">Search</button>
+            <a href="{{ route('memberships.index', $scope === 'all' ? ['scope' => 'all'] : []) }}" class="ms-browse__btn ms-browse__btn--ghost">Clear</a>
+        @endif
+    </form>
+
+    @if($scope === 'featured' && $otherJournalPlansCount > 0 && $search === '')
+        <div class="ms-browse">
+            <a href="{{ route('memberships.index', ['scope' => 'all']) }}" class="ms-browse__btn">
+                Browse all journal memberships
+                <span>({{ number_format($otherJournalPlansCount) }} more)</span>
+            </a>
+        </div>
+    @elseif($scope === 'all' && $search === '')
+        <div class="ms-browse">
+            <a href="{{ route('memberships.index') }}" class="ms-browse__btn ms-browse__btn--ghost">← Back to featured journals</a>
+        </div>
+    @endif
+
+    @forelse($availableJournalPlans as $plan)
+        @include('memberships.partials.plan-card', ['plan' => $plan])
+    @empty
+        @if($availablePlatformPlans->isEmpty())
+            <div class="ms-empty">
+                <p class="ms-empty__title">You're fully covered</p>
+                <p class="ms-empty__text">Every available membership is already included in your active access. Check back later to renew or when journals add new options.</p>
+            </div>
+        @elseif($search !== '')
+            <div class="ms-empty">
+                <p class="ms-empty__title">No matching journal memberships</p>
+                <p class="ms-empty__text">Try a different search term, or browse all journal memberships.</p>
+            </div>
+        @elseif($scope === 'featured')
+            <div class="ms-empty">
+                <p class="ms-empty__title">No featured journal memberships right now</p>
+                <p class="ms-empty__text">Browse all journals to see every membership option.</p>
+            </div>
+        @else
+            <div class="ms-empty">
+                <p class="ms-empty__title">No journal memberships available</p>
+                <p class="ms-empty__text">Check back later when journals publish membership plans.</p>
+            </div>
+        @endif
     @endforelse
+
+    @if($journalPlans->hasPages())
+        <div class="ms-pagination">
+            @if($journalPlans->onFirstPage())
+                <span class="ms-browse__btn ms-browse__btn--ghost" style="opacity:.45;pointer-events:none">Previous</span>
+            @else
+                <a href="{{ $journalPlans->previousPageUrl() }}" class="ms-browse__btn ms-browse__btn--ghost">Previous</a>
+            @endif
+            <span class="ms-pagination__meta">Page {{ $journalPlans->currentPage() }} of {{ $journalPlans->lastPage() }}</span>
+            @if($journalPlans->hasMorePages())
+                <a href="{{ $journalPlans->nextPageUrl() }}" class="ms-browse__btn ms-browse__btn--ghost">Next</a>
+            @else
+                <span class="ms-browse__btn ms-browse__btn--ghost" style="opacity:.45;pointer-events:none">Next</span>
+            @endif
+        </div>
+    @endif
 </section>
 
 @if(($reviewerRequestJournals ?? collect())->isNotEmpty())

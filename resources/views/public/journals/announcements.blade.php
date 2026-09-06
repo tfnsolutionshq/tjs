@@ -2,6 +2,15 @@
 
 @section('title', 'Announcements | '.$journal->title)
 @section('meta_description', 'News and calls for submissions from '.$journal->title.'.')
+@section('canonical', route('journals.announcements', $journal))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'Announcements | '.$journal->title,
+        'News and calls for submissions from '.$journal->title.'.',
+        route('journals.announcements', $journal)
+    )])
+@endsection
 
 @section('content')
 @include('public.journals.partials.page-styles')
@@ -55,7 +64,7 @@
                         @auth
                             <a class="j-btn" style="margin-left:auto" href="{{ route('author.submissions.create', ['announcement' => $announcement->id]) }}">Submit manuscript</a>
                         @else
-                            <a class="j-btn" style="margin-left:auto" href="{{ route('login') }}">Log in to submit</a>
+                            <a class="j-btn" style="margin-left:auto" href="{{ route('journals.login', ['journal' => $journal, 'redirect' => url()->current()]) }}">Log in to submit</a>
                         @endauth
                     @endif
                 </div>

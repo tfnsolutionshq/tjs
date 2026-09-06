@@ -534,12 +534,15 @@
                     @if($journalId)<input type="hidden" name="journal_id" value="{{ $journalId }}">@endif
                     @if($status)<input type="hidden" name="status" value="{{ $status }}">@endif
                     @if($visibility)<input type="hidden" name="visibility" value="{{ $visibility }}">@endif
-                    <label for="per_page">Show</label>
-                    <select id="per_page" name="per_page" onchange="this.form.submit()">
-                        @foreach([12, 24, 48] as $n)
-                            <option value="{{ $n }}" @selected($perPage === $n)>{{ $n }}</option>
-                        @endforeach
-                    </select>
+                    <label for="per_page_trigger">Show</label>
+                    <x-tjs-select
+                        name="per_page"
+                        input-id="per_page"
+                        class="tjs-select--compact"
+                        :value="(string) $perPage"
+                        :options="collect([12, 24, 48])->map(fn ($n) => ['value' => (string) $n, 'label' => (string) $n])->all()"
+                        submit-on-change
+                    />
                     <span>per page</span>
                 </form>
             </div>

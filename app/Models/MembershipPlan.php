@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class MembershipPlan extends Model
 {
     protected $fillable = [
-        'journal_id', 'name', 'scope', 'price_amount', 'currency',
+        'journal_id', 'journal_fee_id', 'name', 'scope', 'price_amount', 'currency',
         'duration_days', 'is_active',
     ];
 
@@ -21,6 +21,11 @@ class MembershipPlan extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class);
+    }
+
+    public function journalFee(): BelongsTo
+    {
+        return $this->belongsTo(JournalFee::class);
     }
 
     public function memberships(): HasMany

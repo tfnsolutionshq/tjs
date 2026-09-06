@@ -42,6 +42,7 @@
         'name' => $p->name,
         'scope' => $p->scope,
         'journal_id' => $p->journal_id ? (string) $p->journal_id : '',
+        'journal_fee_id' => $p->journal_fee_id ? (string) $p->journal_fee_id : '',
         'price_amount' => (int) $p->price_amount,
         'currency' => $p->currency ?: 'NGN',
         'duration_days' => (int) $p->duration_days,
@@ -259,6 +260,7 @@
             'name' => old('name'),
             'scope' => old('scope', isset($manageJournal) ? 'journal' : 'platform'),
             'journal_id' => old('journal_id', isset($manageJournal) ? (string) $manageJournal->id : ''),
+            'journal_fee_id' => old('journal_fee_id'),
             'price_amount' => old('price_amount'),
             'currency' => old('currency', 'NGN'),
             'duration_days' => old('duration_days', 365),
@@ -266,6 +268,7 @@
         ]),
         lockedJournal: @js(isset($manageJournal)),
         manageJournalId: @js(isset($manageJournal) ? (string) $manageJournal->id : ''),
+        fees: @js(isset($journalFees) ? $journalFees->map(fn ($f) => ['id' => $f->id, 'amount' => (int) $f->amount, 'currency' => $f->currency])->values() : []),
         openOnLoad: @js($errors->any()),
         editIdOnLoad: @js(old('_plan_id')),
     })"
@@ -307,16 +310,28 @@
             <input type="search" placeholder="Search plans or journals…" x-model="q" @input="onType()" @keydown.enter.prevent="flush()">
                 </div>
         <div class="amp-filters">
-            <select class="amp-select" x-model="scope" @change="go({ scope: scope || null })">
-                <option value="">All scopes</option>
-                <option value="platform">Platform</option>
-                <option value="journal">Journal</option>
-            </select>
-            <select class="amp-select" x-model="active" @change="go({ active: active || null })">
-                <option value="">Any status</option>
-                <option value="1">Active</option>
-                <option value="0">Inactive</option>
-            </select>
+            <x-tjs-select
+                variant="pill"
+                :value="(string) ($scope ?? '')"
+                placeholder="All scopes"
+                :options="[
+                    ['value' => '', 'label' => 'All scopes'],
+                    ['value' => 'platform', 'label' => 'Platform'],
+                    ['value' => 'journal', 'label' => 'Journal'],
+                ]"
+                @picker-change="scope = $event.detail; go({ scope: $event.detail || null })"
+            />
+            <x-tjs-select
+                variant="pill"
+                :value="(string) ($active ?? '')"
+                placeholder="Any status"
+                :options="[
+                    ['value' => '', 'label' => 'Any status'],
+                    ['value' => '1', 'label' => 'Active'],
+                    ['value' => '0', 'label' => 'Inactive'],
+                ]"
+                @picker-change="active = $event.detail; go({ active: $event.detail || null })"
+            />
             <button type="button" class="amp-chip" x-show="q || scope || active" x-cloak @click="clearAll()">Clear</button>
             </div>
     </div>
@@ -467,6 +482,19 @@
                     @endif
                 </div>
 
+                @if(isset($journalFees) && $journalFees->isNotEmpty())
+                <div class="amp-field">
+                    <x-form-label for="amp_journal_fee_id" field="plan.fee">Fee catalog (optional)</x-form-label>
+                    <select id="amp_journal_fee_id" name="journal_fee_id" class="amp-select-field" x-model="form.journal_fee_id" @change="applyFee()">
+                        <option value="">Custom price</option>
+                        @foreach($journalFees as $fee)
+                            <option value="{{ $fee->id }}">{{ $fee->name }} — {{ $fee->formattedAmount() }}</option>
+                        @endforeach
+                    </select>
+                    <p class="amp-toggle__hint" style="margin-top:.35rem">Pick a catalog fee to sync price, or leave blank to set a custom amount.</p>
+                </div>
+                @endif
+
                 <div class="amp-field">
                     <x-form-label for="amp_price_amount" field="plan.price" :required="true" reqClass="amp-req">Price</x-form-label>
                     <div class="amp-price-wrap">
@@ -521,6 +549,7 @@ function ampPlans(cfg) {
         name: '',
         scope: cfg.lockedJournal ? 'journal' : 'platform',
         journal_id: cfg.old?.journal_id && cfg.lockedJournal ? String(cfg.old.journal_id) : (cfg.lockedJournal ? String(cfg.old?.journal_id || '') : ''),
+        journal_fee_id: '',
         price_amount: '',
         currency: 'NGN',
         duration_days: 365,
@@ -543,6 +572,14 @@ function ampPlans(cfg) {
             { days: 180, label: '6 months' },
             { days: 365, label: '1 year' },
         ],
+        fees: cfg.fees || [],
+        applyFee() {
+            const fee = this.fees.find((f) => String(f.id) === String(this.form.journal_fee_id));
+            if (fee) {
+                this.form.price_amount = fee.amount;
+                this.form.currency = fee.currency || 'NGN';
+            }
+        },
         init() {
             if (cfg.lockedJournal && cfg.old?.journal_id) {
                 this.form.journal_id = String(cfg.old.journal_id);
@@ -555,6 +592,7 @@ function ampPlans(cfg) {
                         name: cfg.old.name || '',
                         scope: cfg.lockedJournal ? 'journal' : (cfg.old.scope || 'platform'),
                         journal_id: cfg.old.journal_id ? String(cfg.old.journal_id) : '',
+                        journal_fee_id: cfg.old.journal_fee_id ? String(cfg.old.journal_fee_id) : '',
                         price_amount: cfg.old.price_amount ?? '',
                         currency: cfg.old.currency || 'NGN',
                         duration_days: cfg.old.duration_days || 365,
@@ -587,6 +625,7 @@ function ampPlans(cfg) {
                 name: plan.name,
                 scope: plan.scope,
                 journal_id: plan.journal_id || '',
+                journal_fee_id: plan.journal_fee_id || '',
                 price_amount: plan.price_amount,
                 currency: plan.currency || 'NGN',
                 duration_days: plan.duration_days || 365,

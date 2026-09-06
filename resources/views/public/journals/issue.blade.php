@@ -6,45 +6,18 @@
 
 @php
     $cover = $issue->coverUrl();
-@endphp
-
-@section('seo')
-    <meta property="og:title" content="{{ $issue->label() }} | {{ $journal->title }}">
-    <meta property="og:description" content="{{ $issue->title ?: ('Articles in '.$issue->label().' of '.$journal->title) }}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('journals.issues.show', [$journal, $issue]) }}">
-    <meta property="og:site_name" content="{{ $journal->title }}">
-    @if($cover)
-        <meta property="og:image" content="{{ $cover }}">
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:image" content="{{ $cover }}">
-    @endif
-    <meta name="twitter:title" content="{{ $issue->label() }}">
-    <script type="application/ld+json">
-    {!! json_encode(array_filter([
-        '@context' => 'https://schema.org',
-        '@type' => 'PublicationIssue',
-        'name' => $issue->label(),
-        'issueNumber' => (string) $issue->issue_number,
-        'image' => $cover,
-        'url' => route('journals.issues.show', [$journal, $issue]),
-        'isPartOf' => [
-            '@type' => 'PublicationVolume',
-            'volumeNumber' => (string) $issue->volume?->volume_number,
-            'image' => $issue->volume?->coverUrl(),
-            'isPartOf' => [
-                '@type' => 'Periodical',
-                'name' => $journal->title,
-                'issn' => $issue->volume?->issn ?: $journal->issn,
-            ],
-        ],
-        'hasPart' => $schemaArticles->map(fn ($a) => [
+    $pageMeta = app(\App\Services\Seo\PageMeta::class)->issue($journal, $issue);
+    if (isset($pageMeta['json_ld']) && isset($schemaArticles)) {
+        $pageMeta['json_ld']['hasPart'] = $schemaArticles->map(fn ($a) => [
             '@type' => 'ScholarlyArticle',
             'headline' => $a->title,
             'url' => route('journals.articles.show', [$journal, $a]),
-        ])->values()->all(),
-    ]), JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT) !!}
-    </script>
+        ])->values()->all();
+    }
+@endphp
+
+@section('seo')
+    @include('seo.page-meta', ['meta' => $pageMeta])
 @endsection
 
 @section('content')

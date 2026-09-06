@@ -6,15 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Journal;
 use App\Models\User;
 use App\Services\Journal\CategoryService;
+use App\Services\Journal\FeaturedJournalRequestService;
+use App\Services\Storage\ArticleStorage;
+use App\Services\Storage\HybridDisk;
 use App\Support\JournalTheme;
 use App\Support\JournalTeamRoles;
 use App\Support\Licenses;
 use App\Support\ReviewType;
+use App\Support\SafeHtml;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -22,6 +25,13 @@ use Illuminate\View\View;
 
 class JournalAdminController extends Controller
 {
+    public function __construct(
+        private ArticleStorage $storage,
+        private HybridDisk $disks,
+        private FeaturedJournalRequestService $featuredRequests,
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $query = Journal::query()
@@ -46,6 +56,8 @@ class JournalAdminController extends Controller
             $query->where('is_active', false);
         } elseif ($status === 'featured') {
             $query->where('is_featured', true);
+        } elseif ($status === 'featured_requests') {
+            $this->featuredRequests->scopePendingRequests($query);
         }
 
         $perPage = (int) $request->integer('per_page', 6);
@@ -59,6 +71,7 @@ class JournalAdminController extends Controller
             'total' => Journal::query()->count(),
             'active' => Journal::query()->where('is_active', true)->count(),
             'featured' => Journal::query()->where('is_featured', true)->count(),
+            'featured_requests' => $this->featuredRequests->scopePendingRequests(Journal::query())->count(),
             'inactive' => Journal::query()->where('is_active', false)->count(),
         ];
 
@@ -89,7 +102,10 @@ class JournalAdminController extends Controller
             $journal = Journal::query()->findOrFail($exceptId);
             abort_unless($journal->userMayMutate($user), 403);
         } else {
-            abort_unless($user->canAccessPlatformAdmin(), 403);
+            abort_unless(
+                $user->canAccessPlatformAdmin() || $user->hasVerifiedEmail(),
+                403
+            );
         }
 
         $slug = Str::slug($data['slug']);
@@ -121,6 +137,7 @@ class JournalAdminController extends Controller
         $data = $this->validated($request);
         $data['is_active'] = $request->boolean('is_active', true);
         $data['is_featured'] = $request->boolean('is_featured');
+        $data['personal_gateway_allowed'] = $request->boolean('personal_gateway_allowed', true);
         $data['theme'] = $this->themeFromRequest($request);
 
         $team = $this->validatedInitialAdmin($request);
@@ -129,6 +146,7 @@ class JournalAdminController extends Controller
         $this->storeBrandAssets($request, $journal);
         $this->assignInitialAdmin($journal, $team);
         app(CategoryService::class)->seedDefaults($journal);
+        $journal->markActivationWaived();
 
         return redirect()
             ->route('admin.journals.edit', $journal)
@@ -172,12 +190,14 @@ class JournalAdminController extends Controller
 
         $data = $this->validated($request, $journal);
         $data['is_active'] = $request->boolean('is_active');
-        $data['is_featured'] = $request->boolean('is_featured');
-        $data['theme'] = $this->themeFromRequest($request);
-
         if ($fromJournalManage) {
+            unset($data['is_featured']);
             $data['allow_platform_admin_edits'] = $request->boolean('allow_platform_admin_edits');
+        } else {
+            $data['is_featured'] = $request->boolean('is_featured');
+            $data['personal_gateway_allowed'] = $request->boolean('personal_gateway_allowed', true);
         }
+        $data['theme'] = $this->themeFromRequest($request);
 
         unset($data['slug']);
 
@@ -203,13 +223,31 @@ class JournalAdminController extends Controller
         $title = $journal->title;
         $slug = $journal->slug;
 
-        Storage::disk('public')->deleteDirectory('journals/'.$slug);
+        $this->disks->deleteDirectory('journals/'.$slug);
 
         $journal->delete();
 
         return redirect()
             ->route('admin.journals.index')
             ->with('status', "Journal “{$title}” deleted.");
+    }
+
+    public function approveFeatured(Journal $journal): RedirectResponse
+    {
+        try {
+            $this->featuredRequests->approve($journal);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "“{$journal->title}” is now featured on the homepage.");
+    }
+
+    public function dismissFeatured(Journal $journal): RedirectResponse
+    {
+        $this->featuredRequests->dismiss($journal);
+
+        return back()->with('status', 'Featured request dismissed.');
     }
 
     /**
@@ -288,6 +326,8 @@ class JournalAdminController extends Controller
             $data['initials'] = null;
         }
 
+        $data['description'] = SafeHtml::clean($data['description'] ?? null);
+
         return $data;
     }
 
@@ -311,28 +351,28 @@ class JournalAdminController extends Controller
 
     private function storeBrandAssets(Request $request, Journal $journal): void
     {
-        $dir = 'journals/'.$journal->slug.'/branding';
-
         if ($request->boolean('remove_logo') && $journal->logo_path) {
-            Storage::disk('public')->delete($journal->logo_path);
+            $this->disks->delete($journal->logo_path, HybridDisk::KIND_MEDIA, $journal->logo_disk);
             $journal->logo_path = null;
+            $journal->logo_disk = null;
         }
         if ($request->boolean('remove_header_image') && $journal->header_image_path) {
-            Storage::disk('public')->delete($journal->header_image_path);
+            $this->disks->delete($journal->header_image_path, HybridDisk::KIND_MEDIA, $journal->header_image_disk);
             $journal->header_image_path = null;
+            $journal->header_image_disk = null;
         }
 
         if ($request->hasFile('logo')) {
             if ($journal->logo_path) {
-                Storage::disk('public')->delete($journal->logo_path);
+                $this->disks->delete($journal->logo_path, HybridDisk::KIND_MEDIA, $journal->logo_disk);
             }
-            $journal->logo_path = $request->file('logo')->store($dir, 'public');
+            [$journal->logo_path, $journal->logo_disk] = $this->storage->storeBrandAsset($journal, $request->file('logo'), 'logo');
         }
         if ($request->hasFile('header_image')) {
             if ($journal->header_image_path) {
-                Storage::disk('public')->delete($journal->header_image_path);
+                $this->disks->delete($journal->header_image_path, HybridDisk::KIND_MEDIA, $journal->header_image_disk);
             }
-            $journal->header_image_path = $request->file('header_image')->store($dir, 'public');
+            [$journal->header_image_path, $journal->header_image_disk] = $this->storage->storeBrandAsset($journal, $request->file('header_image'), 'header');
         }
 
         $journal->save();

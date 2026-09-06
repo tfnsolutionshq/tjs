@@ -13,6 +13,7 @@
         ? route('journal.manage.submissions.show', [$manageJournal, $submission])
         : route('admin.submissions.show', $submission);
     $statusLabels = [
+        'fee_pending' => 'Fee pending',
         'submitted' => 'Submitted',
         'under_review' => 'Under review',
         'revision_requested' => 'Revision requested',
@@ -23,13 +24,18 @@
 
     $statCards = [
         ['key' => null, 'label' => 'Total', 'value' => $stats['total']],
+    ];
+    if (($stats['fee_pending'] ?? 0) > 0 || $status === 'fee_pending') {
+        $statCards[] = ['key' => 'fee_pending', 'label' => 'Fee pending', 'value' => $stats['fee_pending'] ?? 0];
+    }
+    $statCards = array_merge($statCards, [
         ['key' => 'submitted', 'label' => 'Submitted', 'value' => $stats['submitted']],
         ['key' => 'under_review', 'label' => 'In review', 'value' => $stats['under_review']],
         ['key' => 'revision_requested', 'label' => 'Revision', 'value' => $stats['revision_requested']],
         ['key' => 'resubmitted', 'label' => 'Resubmitted', 'value' => $stats['resubmitted']],
         ['key' => 'approved', 'label' => 'Approved', 'value' => $stats['approved']],
         ['key' => 'rejected', 'label' => 'Rejected', 'value' => $stats['rejected']],
-    ];
+    ]);
 
     $filterQs = array_filter([
         'q' => $q !== '' ? $q : null,
@@ -335,12 +341,13 @@
             />
             @endunless
 
-            <select class="asub-select" x-model="status" @change="setStatus(status || null)">
-                <option value="">Any status</option>
-                @foreach($statusLabels as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
+            <x-tjs-select
+                variant="pill"
+                :value="(string) ($status ?? '')"
+                placeholder="Any status"
+                :options="collect($statusLabels)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->prepend(['value' => '', 'label' => 'Any status'])->values()->all()"
+                @picker-change="setStatus($event.detail || null)"
+            />
 
             <button type="button" class="asub-chip" x-show="q || journalId || status" x-cloak @click="clearAll()">
                 Clear filters

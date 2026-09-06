@@ -59,7 +59,7 @@
             @if($submission->abstract)
                 <div>
                     <p style="margin:0;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Abstract</p>
-                    <p style="margin:.35rem 0 0;white-space:pre-wrap;line-height:1.55;color:var(--muted)">{{ $submission->abstract }}</p>
+                    <div class="tjs-prose" style="margin:.35rem 0 0;line-height:1.55;color:var(--muted)">{!! \App\Support\SafeHtml::display($submission->abstract) !!}</div>
                 </div>
             @endif
         </div>

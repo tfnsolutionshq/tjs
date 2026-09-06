@@ -12,7 +12,6 @@ use App\Services\Seo\ScholarlyMeta;
 use App\Services\Storage\ArticleStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ArticleController extends Controller
@@ -54,7 +53,7 @@ class ArticleController extends Controller
     {
         abort_unless((int) $article->journal_id === (int) $journal->id, 404);
         abort_unless($this->access->canAccessFullText($request->user(), $article), 403, $this->access->denialReason($request->user(), $article));
-        abort_unless($article->document_path && Storage::disk('local')->exists($article->document_path), 404, 'Document not found.');
+        abort_unless($this->storage->documentExists($article->document_path, $article->document_disk), 404, 'Document not found.');
 
         $article->load(['authors', 'issue.volume', 'journal', 'categories']);
         $meta = $this->scholarlyMeta->forArticle($article);
@@ -76,10 +75,9 @@ class ArticleController extends Controller
 
         abort_unless($this->access->canAccessFullText($request->user(), $article), 403, $this->access->denialReason($request->user(), $article));
 
-        // Update-before-view: refresh path resolution + access stamp
         $article->refresh();
         $path = $article->document_path;
-        abort_unless($path && Storage::disk('local')->exists($path), 404, 'Document not found.');
+        abort_unless($this->storage->documentExists($path, $article->document_disk), 404, 'Document not found.');
 
         $article->forceFill(['last_accessed_at' => now()])->save();
 
@@ -89,11 +87,14 @@ class ArticleController extends Controller
             'action' => 'pdf_view',
             'ip_address' => $request->ip(),
             'user_agent' => (string) $request->userAgent(),
-            'metadata' => ['path' => $path],
+            'metadata' => ['path' => $path, 'disk' => $article->document_disk],
         ]);
 
-        $absolute = Storage::disk('local')->path($path);
-        if ($isPdf = str_ends_with(strtolower($path), '.pdf')) {
+        $absolute = $this->storage->absolutePath($path, $article->document_disk);
+        abort_unless($absolute, 404, 'Document not found.');
+
+        $isPdf = str_ends_with(strtolower($path), '.pdf');
+        if ($isPdf) {
             $article->loadMissing(['authors', 'journal', 'issue.volume']);
             $absolute = $this->pdfStamper->stampedPath($article, $absolute);
         }

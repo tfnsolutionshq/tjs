@@ -4,7 +4,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Admin | '.config('tjs.name'))</title>
+    @php
+        $seoJournal = ($journal ?? null) instanceof \App\Models\Journal
+            ? $journal
+            : (request()->route('journal') instanceof \App\Models\Journal ? request()->route('journal') : null);
+    @endphp
+    <title>@yield('title', ($seoJournal?->title ? $seoJournal->title.' | Manage' : 'Manage | '.config('tjs.name')))</title>
+    @include('seo.portal-head', [
+        'brandJournal' => $seoJournal,
+        'description' => $seoJournal
+            ? ('Journal management for '.$seoJournal->title.'.')
+            : (config('tjs.full_name').' journal management.'),
+    ])
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800|libre-baskerville:400,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -114,6 +125,16 @@
             font-size: .65rem; font-weight: 800; color: #fff;
         }
         .admin-nav a.is-active .admin-nav__badge { background: rgba(255,255,255,.22); }
+        .admin-nav__disabled {
+            display: flex; align-items: center; gap: .65rem;
+            padding: .62rem .7rem; border-radius: .65rem;
+            color: rgba(255,255,255,.32); font-size: .9rem; font-weight: 500;
+            cursor: not-allowed; user-select: none;
+        }
+        .admin-nav__disabled svg {
+            width: 1.1rem; height: 1.1rem; flex-shrink: 0; opacity: .45;
+            stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+        }
 
         .admin-sidebar-select {
             width: 100%;
@@ -567,47 +588,107 @@
 
             <nav class="admin-nav" aria-label="Journal management">
                 @if($jmJournal)
+                    @php $mgmtLocked = $jmJournal->activationLocked(); @endphp
                     <p class="admin-nav__label">Overview</p>
                     <a href="{{ route('journal.manage.dashboard', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.dashboard')]) @click="sidebarOpen = false">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
                         Dashboard
                     </a>
+                    <a href="{{ route('journal.manage.activation.show', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.activation.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3v18M5 10h14M5 14h14"/><path d="M8.5 6.5h7v11h-7z"/></svg>
+                        Activation
+                        @if($mgmtLocked)
+                            <span class="admin-nav__badge">Pay</span>
+                        @endif
+                    </a>
+                    <a href="{{ route('journal.manage.billing.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.billing.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 7.5h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1v-11z"/><path d="M8 7.5V6a2 2 0 012-2h4a2 2 0 012 2v1.5M8 12h.01M12 12h.01M16 12h.01"/></svg>
+                        Payments &amp; Income
+                    </a>
+                    <a href="{{ route('journal.manage.fees.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.fees.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3v18M5 10h14M5 14h14"/><circle cx="12" cy="12" r="3"/></svg>
+                        Fee Catalog
+                    </a>
+                    <a href="{{ route('journal.manage.payments.gateway', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.payments.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+                        Payment Gateway
+                    </a>
+                    <a href="{{ route('journal.manage.doi.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.doi.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 7h10v10H7z"/><path d="M9.5 12h5M12 9.5v5"/></svg>
+                        DOI
+                        @if(($jmJournal->doi_mode ?? null) === 'platform' && (int) $jmJournal->doi_credits_balance <= 0)
+                            <span class="admin-nav__badge">0</span>
+                        @endif
+                    </a>
 
                     <p class="admin-nav__label">Catalog</p>
-                    <a href="{{ route('journal.manage.articles.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.articles.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
-                        Articles
-                    </a>
-                    <a href="{{ route('journal.manage.volumes.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.volumes.*') || request()->routeIs('journal.manage.issues.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
-                        Volumes &amp; issues
-                    </a>
+                    @if($mgmtLocked)
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
+                            Articles
+                        </span>
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
+                            Volumes &amp; Issues
+                        </span>
+                    @else
+                        <a href="{{ route('journal.manage.articles.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.articles.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
+                            Articles
+                        </a>
+                        <a href="{{ route('journal.manage.volumes.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.volumes.*') || request()->routeIs('journal.manage.issues.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
+                            Volumes &amp; Issues
+                        </a>
+                    @endif
 
                     <p class="admin-nav__label">Editorial</p>
-                    <a href="{{ route('journal.manage.submissions.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.submissions.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 14l2.5-7.5A1 1 0 017.45 6h9.1a1 1 0 01.95.5L20 14"/><path d="M4 14h4.2a2 2 0 011.8 1.1l.4.8a1 1 0 00.9.6h1.4a1 1 0 00.9-.6l.4-.8A2 2 0 0115.8 14H20v4.5a1 1 0 01-1 1H5a1 1 0 01-1-1V14z"/></svg>
-                        Submissions
-                        @if(($journalPendingSubmissions ?? 0) > 0)
-                            <span class="admin-nav__badge">{{ $journalPendingSubmissions > 99 ? '99+' : $journalPendingSubmissions }}</span>
-                        @endif
-                    </a>
-                    <a href="{{ route('journal.manage.announcements.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.announcements.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" d="M12 7.5v9M7.5 12h9"/><path d="M6.5 4.5h11A2 2 0 0119.5 6.5v11a2 2 0 01-2 2h-11a2 2 0 01-2-2v-11a2 2 0 012-2z"/></svg>
-                        Announcements
-                    </a>
-                    <a href="{{ route('journal.manage.reviewer-requests.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.reviewer-requests.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
-                        Reviewer requests
-                        @if(($journalPendingReviewerRequests ?? 0) > 0)
-                            <span class="admin-nav__badge">{{ $journalPendingReviewerRequests > 99 ? '99+' : $journalPendingReviewerRequests }}</span>
-                        @endif
-                    </a>
+                    @if($mgmtLocked)
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 14l2.5-7.5A1 1 0 017.45 6h9.1a1 1 0 01.95.5L20 14"/><path d="M4 14h4.2a2 2 0 011.8 1.1l.4.8a1 1 0 00.9.6h1.4a1 1 0 00.9-.6l.4-.8A2 2 0 0115.8 14H20v4.5a1 1 0 01-1 1H5a1 1 0 01-1-1V14z"/></svg>
+                            Submissions
+                        </span>
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" d="M12 7.5v9M7.5 12h9"/><path d="M6.5 4.5h11A2 2 0 0119.5 6.5v11a2 2 0 01-2 2h-11a2 2 0 01-2-2v-11a2 2 0 012-2z"/></svg>
+                            Announcements
+                        </span>
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+                            Reviewer Requests
+                        </span>
+                    @else
+                        <a href="{{ route('journal.manage.submissions.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.submissions.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 14l2.5-7.5A1 1 0 017.45 6h9.1a1 1 0 01.95.5L20 14"/><path d="M4 14h4.2a2 2 0 011.8 1.1l.4.8a1 1 0 00.9.6h1.4a1 1 0 00.9-.6l.4-.8A2 2 0 0115.8 14H20v4.5a1 1 0 01-1 1H5a1 1 0 01-1-1V14z"/></svg>
+                            Submissions
+                            @if(($journalPendingSubmissions ?? 0) > 0)
+                                <span class="admin-nav__badge">{{ $journalPendingSubmissions > 99 ? '99+' : $journalPendingSubmissions }}</span>
+                            @endif
+                        </a>
+                        <a href="{{ route('journal.manage.announcements.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.announcements.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" d="M12 7.5v9M7.5 12h9"/><path d="M6.5 4.5h11A2 2 0 0119.5 6.5v11a2 2 0 01-2 2h-11a2 2 0 01-2-2v-11a2 2 0 012-2z"/></svg>
+                            Announcements
+                        </a>
+                        <a href="{{ route('journal.manage.reviewer-requests.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.reviewer-requests.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+                            Reviewer Requests
+                            @if(($journalPendingReviewerRequests ?? 0) > 0)
+                                <span class="admin-nav__badge">{{ $journalPendingReviewerRequests > 99 ? '99+' : $journalPendingReviewerRequests }}</span>
+                            @endif
+                        </a>
+                    @endif
 
                     <p class="admin-nav__label">Access</p>
-                    <a href="{{ route('journal.manage.membership-plans.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.membership-plans.*')]) @click="sidebarOpen = false">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4.5 20.2a7.5 7.5 0 0115 0"/></svg>
-                        Membership plans
-                    </a>
+                    @if($mgmtLocked)
+                        <span class="admin-nav__disabled" title="Pay activation fee to unlock">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4.5 20.2a7.5 7.5 0 0115 0"/></svg>
+                            Membership Plans
+                        </span>
+                    @else
+                        <a href="{{ route('journal.manage.membership-plans.index', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.membership-plans.*')]) @click="sidebarOpen = false">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4.5 20.2a7.5 7.5 0 0115 0"/></svg>
+                            Membership Plans
+                        </a>
+                    @endif
 
                     <p class="admin-nav__label">Journal</p>
                     <a href="{{ route('journal.manage.settings.edit', $jmJournal) }}" @class(['is-active' => request()->routeIs('journal.manage.settings.*') || request()->routeIs('journal.manage.editorial-board.*')]) @click="sidebarOpen = false">
@@ -618,17 +699,17 @@
                     <p class="admin-nav__label">Context</p>
                     <a href="{{ route('journals.show', $jmJournal) }}" target="_blank" rel="noopener" @click="sidebarOpen = false">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M14 5h5v5"/><path d="M10 14L19 5"/><path d="M19 13.5V18a1 1 0 01-1 1H6a1 1 0 01-1-1V6a1 1 0 011-1h4.5"/></svg>
-                        Public journal
+                        Public Journal
                     </a>
                     @if($isPlatformAdminHere)
                         <a href="{{ route('admin.dashboard') }}" @click="sidebarOpen = false" style="background:rgba(47,125,225,.16);color:#93c5fd">
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
-                            Exit to platform admin
+                            Exit to Platform Admin
                         </a>
                     @else
                         <a href="{{ route('dashboard') }}" @click="sidebarOpen = false">
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
-                            Member portal
+                            Member Portal
                         </a>
                     @endif
                     <a href="{{ route('profile.edit') }}" @click="sidebarOpen = false">
@@ -656,7 +737,7 @@
                     @csrf
                     <button type="submit" class="admin-logout">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H9"/></svg>
-                        Log out
+                        Log Out
                     </button>
                 </form>
             </div>
@@ -680,7 +761,7 @@
                         <a href="{{ route('admin.dashboard') }}" class="admin-btn admin-btn-secondary">Exit to platform admin</a>
                     @endif
                     <a href="{{ isset($journal) ? route('journals.show', $journal) : route('home') }}" class="admin-chip admin-topbar__public" target="_blank" rel="noopener">
-                        Public journal
+                        Public Journal
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18v4.5M18 6l-7 7M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4"/></svg>
                     </a>
                     @yield('page_actions')
@@ -688,6 +769,27 @@
             </header>
 
             <x-flash />
+
+            @if(($jmJournal ?? null) instanceof \App\Models\Journal && $jmJournal->activationLocked())
+                <div style="margin:0 1rem 0;padding:.9rem 1.05rem;border:1px solid #fde68a;border-radius:.9rem;background:#fffbeb;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;justify-content:space-between">
+                    <div style="min-width:12rem">
+                        <p style="margin:0;font-weight:800;color:#92400e;font-size:.9rem">
+                            {{ $jmJournal->activation_status === \App\Support\JournalActivation::STATUS_EXPIRED ? 'Activation expired' : 'Activation fee unpaid' }}
+                        </p>
+                        <p style="margin:.25rem 0 0;font-size:.78rem;color:#a16207;line-height:1.4">
+                            This journal is not listed publicly. Major management menus are locked until activation is current.
+                            @unless(\App\Support\JournalActivation::enabled())
+                                Platform activation payments are currently off — contact a platform admin if you need this unlocked.
+                            @endunless
+                        </p>
+                    </div>
+                    @if(\App\Support\JournalActivation::enabled())
+                        <a href="{{ route('journal.manage.activation.show', $jmJournal) }}" class="admin-btn admin-btn-primary" style="white-space:nowrap">Pay / renew</a>
+                    @else
+                        <a href="{{ route('journal.manage.activation.show', $jmJournal) }}" class="admin-btn admin-btn-secondary" style="white-space:nowrap">Activation status</a>
+                    @endif
+                </div>
+            @endif
 
             <main class="admin-content">
                 @yield('content')

@@ -178,7 +178,7 @@ class DatabaseSeeder extends Seeder
         Storage::disk('local')->makeDirectory($dir);
         $pdf = "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n";
         Storage::disk('local')->put($path, $pdf);
-        $article->update(['document_path' => $path]);
+        $article->update(['document_path' => $path, 'document_disk' => 'local']);
 
         MembershipPlan::query()->updateOrCreate(
             ['name' => $journal->title.' Membership', 'scope' => 'journal', 'journal_id' => $journal->id],

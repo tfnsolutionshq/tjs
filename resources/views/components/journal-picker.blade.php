@@ -7,6 +7,7 @@
     'placeholder' => 'Select journal…',
     'allowEmpty' => false,
     'emptyLabel' => 'All journals',
+    'submitOnChange' => false,
     'class' => '',
 ])
 
@@ -27,10 +28,11 @@
         allowEmpty: @js((bool) $allowEmpty),
         emptyLabel: @js($emptyLabel),
         placeholder: @js($placeholder),
+        submitOnChange: @js((bool) $submitOnChange),
     })"
     @keydown.escape.window="open = false"
 >
-    <input type="hidden" name="{{ $name }}" id="{{ $inputId }}" :value="selectedId" @if($required) required @endif>
+    <input type="hidden" name="{{ $name }}" id="{{ $inputId }}" x-ref="hidden" :value="selectedId" @if($required) required @endif>
 
     <button type="button" class="tjs-journal-picker__trigger" @click="open = !open" :aria-expanded="open">
         <span class="tjs-journal-picker__label" :class="!selectedTitle && 'is-empty'" x-text="selectedTitle || @js($placeholder)"></span>
@@ -183,6 +185,7 @@ function journalPicker(cfg) {
         allowEmpty: !!cfg.allowEmpty,
         emptyLabel: cfg.emptyLabel || 'All journals',
         placeholder: cfg.placeholder || 'Select journal…',
+        submitOnChange: !!cfg.submitOnChange,
         selectedId: cfg.value || '',
         get filtered() {
             const needle = this.q.trim().toLowerCase();
@@ -209,7 +212,23 @@ function journalPicker(cfg) {
             this.open = false;
             this.q = '';
             this.hot = 0;
+
+            const hidden = this.$refs.hidden;
+
+            if (hidden) {
+                hidden.value = id;
+                hidden.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
             this.$dispatch('picker-change', id);
+
+            if (this.submitOnChange) {
+                const form = this.$el.closest('form');
+
+                if (form) {
+                    form.requestSubmit();
+                }
+            }
         },
         pickHighlighted() {
             const option = this.filtered[this.hot];

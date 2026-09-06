@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\JournalPickerController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -12,15 +13,19 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    Route::get('journals/picker', JournalPickerController::class)->name('journals.picker');
+
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
-
     Route::post('register', [RegisteredUserController::class, 'store']);
+    Route::get('register/journals', [RegisteredUserController::class, 'chooseJournal'])
+        ->name('register.journals');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
-
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::get('login/journals', [AuthenticatedSessionController::class, 'chooseJournal'])
+        ->name('login.journals');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

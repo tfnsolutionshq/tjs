@@ -4,7 +4,9 @@ namespace App\Http\Controllers\JournalManage;
 
 use App\Http\Controllers\Controller;
 use App\Models\Journal;
+use App\Models\JournalFee;
 use App\Models\MembershipPlan;
+use App\Support\JournalFeePurpose;
 use App\Support\Licenses;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,6 +43,13 @@ class MembershipPlanController extends Controller
         $scope = 'journal';
         $manageJournal = $journal;
 
+        $journalFees = JournalFee::query()
+            ->where('journal_id', $journal->id)
+            ->active()
+            ->forPurpose(JournalFeePurpose::MEMBERSHIP)
+            ->orderBy('name')
+            ->get();
+
         return view('admin.membership-plans.index', compact(
             'plans',
             'journals',
@@ -50,6 +59,7 @@ class MembershipPlanController extends Controller
             'q',
             'manageJournal',
             'journal',
+            'journalFees',
         ));
     }
 
@@ -57,18 +67,22 @@ class MembershipPlanController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'journal_fee_id' => ['nullable', 'integer', 'exists:journal_fees,id'],
             'price_amount' => ['required', 'integer', 'min:0'],
             'currency' => ['nullable', 'string', 'max:8'],
             'duration_days' => ['required', 'integer', 'min:1', 'max:3650'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        $fee = $this->resolveMembershipFee($journal, $request->integer('journal_fee_id') ?: null);
+
         MembershipPlan::query()->create([
             'name' => $data['name'],
             'scope' => 'journal',
             'journal_id' => $journal->id,
-            'price_amount' => $data['price_amount'],
-            'currency' => strtoupper($data['currency'] ?? 'NGN'),
+            'journal_fee_id' => $fee?->id,
+            'price_amount' => $fee ? (int) $fee->amount : (int) $data['price_amount'],
+            'currency' => strtoupper($fee ? $fee->currency : ($data['currency'] ?? 'NGN')),
             'duration_days' => $data['duration_days'],
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -87,18 +101,22 @@ class MembershipPlanController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'journal_fee_id' => ['nullable', 'integer', 'exists:journal_fees,id'],
             'price_amount' => ['required', 'integer', 'min:0'],
             'currency' => ['nullable', 'string', 'max:8'],
             'duration_days' => ['required', 'integer', 'min:1', 'max:3650'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        $fee = $this->resolveMembershipFee($journal, $request->integer('journal_fee_id') ?: null);
+
         $membershipPlan->update([
             'name' => $data['name'],
             'scope' => 'journal',
             'journal_id' => $journal->id,
-            'price_amount' => $data['price_amount'],
-            'currency' => strtoupper($data['currency'] ?? 'NGN'),
+            'journal_fee_id' => $fee?->id,
+            'price_amount' => $fee ? (int) $fee->amount : (int) $data['price_amount'],
+            'currency' => strtoupper($fee ? $fee->currency : ($data['currency'] ?? 'NGN')),
             'duration_days' => $data['duration_days'],
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -140,5 +158,19 @@ class MembershipPlanController extends Controller
         return redirect()
             ->route('journal.manage.membership-plans.index', $journal)
             ->with('status', 'Membership plan deleted.');
+    }
+
+    private function resolveMembershipFee(Journal $journal, ?int $feeId): ?JournalFee
+    {
+        if (! $feeId) {
+            return null;
+        }
+
+        return JournalFee::query()
+            ->where('journal_id', $journal->id)
+            ->where('id', $feeId)
+            ->active()
+            ->forPurpose(JournalFeePurpose::MEMBERSHIP)
+            ->firstOrFail();
     }
 }

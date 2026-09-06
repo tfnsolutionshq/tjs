@@ -122,4 +122,36 @@ class CallForSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('Editorial update');
     }
+
+    public function test_manager_can_create_issue_from_announcement_form(): void
+    {
+        $journal = Journal::query()->create([
+            'slug' => 'demo-journal',
+            'title' => 'Demo Journal',
+            'is_active' => true,
+        ]);
+        $manager = User::factory()->create(['role' => 'member']);
+        $journal->assignTeamMember($manager, JournalTeamRoles::ADMIN);
+
+        $this->actingAs($manager)
+            ->postJson(route('journal.manage.announcements.quick-issue', $journal), [
+                'volume_number' => 1,
+                'year' => 2026,
+                'volume_title' => 'Inaugural Volume',
+                'issue_number' => 1,
+                'issue_title' => 'General Issue',
+            ])
+            ->assertOk()
+            ->assertJsonPath('issue.label', 'Vol. 1 No. 1 (2026) — General Issue');
+
+        $this->assertDatabaseHas('volumes', [
+            'journal_id' => $journal->id,
+            'volume_number' => 1,
+            'year' => 2026,
+        ]);
+        $this->assertDatabaseHas('issues', [
+            'issue_number' => 1,
+            'title' => 'General Issue',
+        ]);
+    }
 }

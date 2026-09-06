@@ -32,6 +32,10 @@
     @endisset
 @endsection
 
+@php
+    $publicationFees = $publicationFees ?? collect();
+@endphp
+
 @section('content')
 @php
     $nextVolume = ((int) ($volumes->max('volume_number') ?? 0)) + 1;
@@ -387,6 +391,11 @@
                                                 {{ optional($issue->period_end)->format('M j, Y') ?: '…' }}
                                             </span>
                                         @endif
+                                        @if($issue->journalFee)
+                                            <span style="margin-left:.35rem;color:#b45309">
+                                                APC {{ $issue->journalFee->formattedAmount() }}
+                                            </span>
+                                        @endif
                                     </p>
                                 </div>
                                 <button type="button" class="av-toggle" @click="open = !open">
@@ -432,6 +441,18 @@
                                     <label>Cover</label>
                                     <input name="cover" type="file" accept=".jpg,.jpeg,.png,.webp" class="av-file">
                                 </div>
+                                <div class="av-field av-span-2">
+                                    <label for="issue_fee_{{ $issue->id }}">Publication fee (APC)</label>
+                                    <select id="issue_fee_{{ $issue->id }}" name="journal_fee_id" class="av-select">
+                                        <option value="">No publication fee — free to publish</option>
+                                        @foreach($publicationFees as $fee)
+                                            <option value="{{ $fee->id }}" @selected((string) old('journal_fee_id', $issue->journal_fee_id) === (string) $fee->id)>
+                                                {{ $fee->name }} — {{ number_format($fee->amount) }} {{ strtoupper($fee->currency) }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <p style="margin:.35rem 0 0;font-size:.74rem;color:var(--muted)">Authors pay this after acceptance, before the article is published in the issue.</p>
+                                </div>
                                 <div class="av-actions" style="grid-column:1/-1;margin-top:0">
                                     <button type="submit" class="admin-btn admin-btn-primary">Save issue</button>
                                 </div>
@@ -475,6 +496,18 @@
                             <div class="av-field">
                                 <label>Cover</label>
                                 <input name="cover" type="file" accept=".jpg,.jpeg,.png,.webp" class="av-file">
+                            </div>
+                            <div class="av-field av-span-2">
+                                <label>Publication fee (APC)</label>
+                                <select name="journal_fee_id" class="av-select">
+                                    <option value="">No publication fee — free to publish</option>
+                                    @foreach($publicationFees as $fee)
+                                        <option value="{{ $fee->id }}" @selected((string) old('journal_fee_id') === (string) $fee->id)>
+                                            {{ $fee->name }} — {{ number_format($fee->amount) }} {{ strtoupper($fee->currency) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p style="margin:.35rem 0 0;font-size:.74rem;color:var(--muted)">Authors pay this after acceptance, before the article is published in the issue.</p>
                             </div>
                         </div>
                         <div class="av-actions">

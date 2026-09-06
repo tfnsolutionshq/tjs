@@ -5,16 +5,13 @@
 @section('canonical', route('journals.archive', $journal))
 
 @section('seo')
-    <meta property="og:title" content="Archives | {{ $journal->title }}">
-    <meta property="og:description" content="Browse published volumes and issues of {{ $journal->title }}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('journals.archive', $journal) }}">
-    <meta property="og:site_name" content="{{ $journal->title }}">
-    @if($journal->headerImageUrl() || $journal->logoUrl())
-        <meta property="og:image" content="{{ $journal->headerImageUrl() ?: $journal->logoUrl() }}">
-    @elseif($volumes->first()?->coverUrl())
-        <meta property="og:image" content="{{ $volumes->first()->coverUrl() }}">
-    @endif
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'Archives | '.$journal->title,
+        'Browse published volumes and issues of '.$journal->title,
+        route('journals.archive', $journal),
+        $journal->headerImageUrl() ?: ($journal->logoUrl() ?: $volumes->first()?->coverUrl())
+    )])
 @endsection
 
 @section('content')

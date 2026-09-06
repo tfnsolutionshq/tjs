@@ -5,14 +5,13 @@
 @section('canonical', route('journals.show', $journal))
 
 @section('seo')
-    <meta property="og:title" content="{{ $journal->title }}">
-    <meta property="og:description" content="{{ $journal->subtitle ?: Str::limit(strip_tags($journal->description), 155) }}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ route('journals.show', $journal) }}">
-    <meta property="og:site_name" content="{{ $journal->title }}">
-    @if($journal->headerImageUrl() || $journal->logoUrl() || $currentIssue?->coverUrl())
-        <meta property="og:image" content="{{ $journal->headerImageUrl() ?: ($currentIssue?->coverUrl() ?: $journal->logoUrl()) }}">
-    @endif
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        $journal->title.' | '.config('tjs.name'),
+        $journal->subtitle ?: \Illuminate\Support\Str::limit(strip_tags($journal->description), 155),
+        route('journals.show', $journal),
+        $journal->headerImageUrl() ?: ($currentIssue?->coverUrl() ?: $journal->logoUrl())
+    )])
 @endsection
 
 @section('content')

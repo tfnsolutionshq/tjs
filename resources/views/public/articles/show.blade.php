@@ -34,6 +34,7 @@
 @section('content')
 @php
     $membershipPlan = null;
+    $paidMembershipPlan = null;
     if (! $canAccess && auth()->check() && $article->visibility === 'members_only') {
         $membershipPlan = \App\Models\MembershipPlan::query()
             ->where('is_active', true)
@@ -45,6 +46,7 @@
             })
             ->orderBy('price_amount')
             ->first();
+        $paidMembershipPlan = $membershipPlan && (int) $membershipPlan->price_amount >= 1 ? $membershipPlan : null;
     }
     $parts = $apa['parts'] ?? [];
     $priceLabel = null;
@@ -53,7 +55,7 @@
         $symbol = $currency === 'NGN' ? '₦' : ($currency.' ');
         $priceLabel = $symbol.number_format((int) $article->price_amount);
     }
-    $buyLoginUrl = route('login', ['redirect' => route('journals.articles.show', [$journal, $article])]);
+    $buyLoginUrl = route('journals.login', ['journal' => $journal, 'redirect' => route('journals.articles.show', [$journal, $article])]);
 @endphp
 
 <style>
@@ -200,18 +202,23 @@
                 @endguest
             @elseif($article->visibility === 'members_only')
                 @guest
-                    <a href="{{ $buyLoginUrl }}" class="j-btn">Log in to access</a>
+                    <a href="{{ route('journals.login', ['journal' => $journal, 'redirect' => route('journals.articles.show', [$journal, $article])]) }}" class="j-btn">Log in to access</a>
                 @else
-                    @if($membershipPlan)
-                        <form method="POST" action="{{ route('payments.memberships.buy', $membershipPlan) }}">
+                    @if($paidMembershipPlan)
+                        <form method="POST" action="{{ route('payments.memberships.buy', $paidMembershipPlan) }}">
                             @csrf
-                            <button class="j-btn" type="submit">Become a member (₦{{ number_format($membershipPlan->price_amount) }})</button>
+                            <button class="j-btn" type="submit">Become a member (₦{{ number_format($paidMembershipPlan->price_amount) }})</button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{ route('journals.join', $journal) }}">
+                            @csrf
+                            <button class="j-btn" type="submit">Join as member — free</button>
                         </form>
                     @endif
                 @endguest
             @else
                 @guest
-                    <a href="{{ route('login') }}" class="j-btn">Log in to access</a>
+                    <a href="{{ route('journals.login', ['journal' => $journal, 'redirect' => route('journals.articles.show', [$journal, $article])]) }}" class="j-btn">Log in to access</a>
                 @endguest
             @endif
             <button type="button" class="j-btn-ghost" @click="openCite()">
@@ -259,7 +266,7 @@
 
         <div class="mt-8 border-t pt-5" style="border-color: color-mix(in srgb, var(--j-text) 10%, transparent)">
             <h2 class="text-sm font-semibold">Abstract</h2>
-            <p class="mt-2 whitespace-pre-line text-sm leading-relaxed">{{ $article->abstract }}</p>
+            <div class="mt-2 tjs-prose text-sm leading-relaxed">{!! \App\Support\SafeHtml::display($article->abstract) !!}</div>
         </div>
 
         @if($article->keywords)

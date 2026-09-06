@@ -6,12 +6,14 @@ use App\Models\Category;
 use App\Models\Issue;
 use App\Models\Journal;
 use App\Models\JournalAnnouncement;
+use App\Models\JournalFee;
 use App\Models\ReviewerAssignment;
 use App\Models\Submission;
 use App\Models\User;
 use App\Models\Volume;
 use App\Services\Journal\CategoryService;
 use App\Support\AnnouncementType;
+use App\Support\JournalFeePurpose;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -133,6 +135,58 @@ class AuthorSubmissionTest extends TestCase
                 'document' => UploadedFile::fake()->create('manuscript.docx', 120, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
             ])
             ->assertStatus(422);
+    }
+
+    public function test_submission_applies_required_fee_when_journal_has_paid_submission_fee(): void
+    {
+        Storage::fake('local');
+
+        ['journal' => $journal, 'call' => $call] = $this->seedOpenCall();
+        $fee = JournalFee::query()->create([
+            'journal_id' => $journal->id,
+            'name' => 'UNIZIK JAS Submission Fee',
+            'purpose' => JournalFeePurpose::SUBMISSION,
+            'amount' => 15000,
+            'currency' => 'NGN',
+            'is_active' => true,
+        ]);
+        $member = User::factory()->create(['role' => 'member']);
+
+        $this->actingAs($member)->post(route('author.submissions.store'), [
+            'announcement_id' => $call->id,
+            'title' => 'Paid submission title',
+            'document' => UploadedFile::fake()->create('manuscript.docx', 120, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('submissions', [
+            'journal_id' => $journal->id,
+            'announcement_id' => $call->id,
+            'author_id' => $member->id,
+            'journal_fee_id' => $fee->id,
+            'status' => 'fee_pending',
+        ]);
+    }
+
+    public function test_create_page_shows_required_submission_fee_without_free_option(): void
+    {
+        ['journal' => $journal, 'call' => $call] = $this->seedOpenCall();
+        JournalFee::query()->create([
+            'journal_id' => $journal->id,
+            'name' => 'UNIZIK JAS Submission Fee',
+            'purpose' => JournalFeePurpose::SUBMISSION,
+            'amount' => 15000,
+            'currency' => 'NGN',
+            'is_active' => true,
+        ]);
+        $member = User::factory()->create(['role' => 'member']);
+
+        $this->actingAs($member)
+            ->get(route('author.submissions.create', ['announcement' => $call->id]))
+            ->assertOk()
+            ->assertDontSee('No fee — submit for free', false)
+            ->assertSee('Submission fee', false)
+            ->assertSee('UNIZIK JAS Submission Fee', false)
+            ->assertSee('requires payment when you submit to this call', false);
     }
 
     public function test_member_can_resubmit_revision_with_document(): void

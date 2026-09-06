@@ -246,8 +246,16 @@
         font-size: .95rem;
         line-height: 1.7;
         color: var(--j-text);
-        white-space: pre-line;
     }
+    .jp-prose.tjs-prose p { margin: 0 0 .85em; }
+    .jp-prose.tjs-prose ul,
+    .jp-prose.tjs-prose ol { margin: .35em 0 .85em; padding-left: 1.35rem; }
+    .jp-prose.tjs-prose ul { list-style-type: disc; }
+    .jp-prose.tjs-prose ol { list-style-type: decimal; }
+    .jp-prose.tjs-prose ul ul { list-style-type: circle; }
+    .jp-prose.tjs-prose ol ol { list-style-type: lower-alpha; }
+    .jp-prose.tjs-prose li { display: list-item; margin: .2em 0; }
+    .jp-prose.tjs-prose a { color: var(--j-accent, #1d4ed8); }
 
     .jp-meta-list {
         display: grid;

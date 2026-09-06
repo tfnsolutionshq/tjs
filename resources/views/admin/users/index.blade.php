@@ -8,6 +8,7 @@
 @php
     $role = $role ?? request('role');
     $journalFilter = $journalFilter ?? request('journal');
+    $journalId = $journalId ?? request('journal_id');
     $indexUrl = route('admin.users.index');
 @endphp
 
@@ -37,10 +38,13 @@
     .au-search:focus-within { border-color:#93c5fd; background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
     .au-search svg { width:1rem; height:1rem; color:var(--muted); flex-shrink:0; }
     .au-search input { width:100%; border:0; outline:0; background:transparent; font:inherit; font-size:.9rem; color:var(--ink); }
-    .au-select {
-        border:1px solid var(--line); border-radius:.75rem; background:#fff; padding:.62rem .75rem;
-        font:inherit; font-size:.84rem; font-weight:600; color:var(--ink);
+    .au-toolbar__filters {
+        display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;
     }
+    @media (min-width:860px){ .au-toolbar__filters{ flex-shrink:0; } }
+    .au-toolbar .tjs-select { min-width:10.5rem; }
+    .au-toolbar .tjs-select--compact { min-width:7.5rem; }
+    .au-toolbar .tjs-journal-picker { min-width:12rem; max-width:16rem; }
 
     .au-table-wrap {
         background:#fff; border:1px solid var(--line); border-radius:1.05rem; overflow:hidden;
@@ -86,7 +90,7 @@
 </style>
 
 <div class="au-stats">
-    <a href="{{ $indexUrl }}" class="au-stat @if(! $role && ! $journalFilter) is-active @endif">
+    <a href="{{ $indexUrl }}" class="au-stat @if(! $role && ! $journalFilter && ! $journalId) is-active @endif">
         <p class="au-stat__label">Total</p>
         <p class="au-stat__value">{{ number_format($stats['total']) }}</p>
     </a>
@@ -113,24 +117,49 @@
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
         <input type="search" name="q" placeholder="Search name, email, affiliation…" value="{{ request('q') }}" x-model="q" autocomplete="off">
     </div>
-    <select name="role" class="au-select" onchange="this.form.submit()">
-        <option value="">All roles</option>
-        <option value="admin" @selected($role === 'admin')>Platform admin</option>
-        <option value="member" @selected($role === 'member')>Member</option>
-        <option value="reviewer" @selected($role === 'reviewer')>Reviewer</option>
-        <option value="editor" @selected($role === 'editor')>Editor (legacy)</option>
-    </select>
-    <select name="journal" class="au-select" onchange="this.form.submit()">
-        <option value="">Any journal link</option>
-        <option value="assigned" @selected($journalFilter === 'assigned')>On a journal team</option>
-        <option value="unassigned" @selected($journalFilter === 'unassigned')>No journal team</option>
-    </select>
-    <select name="per_page" class="au-select" onchange="this.form.submit()">
-        @foreach([12, 24, 48] as $n)
-            <option value="{{ $n }}" @selected((int) $perPage === $n)>{{ $n }} / page</option>
-        @endforeach
-    </select>
-    <button type="submit" class="admin-btn admin-btn-secondary">Search</button>
+    <div class="au-toolbar__filters">
+        <x-tjs-select
+            name="role"
+            :value="(string) ($role ?? '')"
+            placeholder="All roles"
+            :options="[
+                ['value' => '', 'label' => 'All roles'],
+                ['value' => 'admin', 'label' => 'Platform admin'],
+                ['value' => 'member', 'label' => 'Member'],
+                ['value' => 'reviewer', 'label' => 'Reviewer'],
+                ['value' => 'editor', 'label' => 'Editor (legacy)'],
+            ]"
+            submit-on-change
+        />
+        <x-tjs-select
+            name="journal"
+            :value="(string) ($journalFilter ?? '')"
+            placeholder="Any team status"
+            :options="[
+                ['value' => '', 'label' => 'Any team status'],
+                ['value' => 'assigned', 'label' => 'On a journal team'],
+                ['value' => 'unassigned', 'label' => 'No journal team'],
+            ]"
+            submit-on-change
+        />
+        <x-journal-picker
+            :journals="$journals"
+            name="journal_id"
+            :value="(string) ($journalId ?? '')"
+            allow-empty
+            empty-label="All journals"
+            placeholder="Filter by journal…"
+            submit-on-change
+        />
+        <x-tjs-select
+            name="per_page"
+            class="tjs-select--compact"
+            :value="(string) $perPage"
+            :options="collect([12, 24, 48])->map(fn ($n) => ['value' => (string) $n, 'label' => $n.' / page'])->all()"
+            submit-on-change
+        />
+        <button type="submit" class="admin-btn admin-btn-secondary">Search</button>
+    </div>
 </form>
 
 <div class="au-table-wrap">

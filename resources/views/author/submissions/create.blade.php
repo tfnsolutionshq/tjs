@@ -140,6 +140,25 @@
     .ns-alert__icon svg { width:.95rem; height:.95rem; }
     .ns-alert__title { margin:0; font-size:.84rem; font-weight:800; color:var(--ink); }
     .ns-alert__text { margin:.25rem 0 0; font-size:.78rem; color:#475569; line-height:1.45; }
+    .ns-guide-panel { border:1px solid #dbeafe; background:linear-gradient(135deg,#f8fbff,#eff6ff); }
+    .ns-guide-panel .mp-card__head { border-bottom:1px solid #dbeafe; }
+    .ns-guide-panel .mp-card__title { color:#1e3a8a; }
+    .ns-guide-panel .mp-card__desc { color:#475569; }
+    .ns-guide-prose { font-size:.84rem; line-height:1.6; color:#334155; }
+    .ns-guide-prose :where(p,ul,ol) { margin:.55rem 0; }
+    .ns-guide-prose :where(h2,h3,h4) { margin:1rem 0 .45rem; font-size:.92rem; font-weight:800; color:var(--ink); }
+    .ns-fees { display:grid; gap:.85rem; margin-top:.15rem; }
+    .ns-fee-group__label {
+        margin:0 0 .45rem; font-size:.68rem; font-weight:800; letter-spacing:.07em;
+        text-transform:uppercase; color:#64748b;
+    }
+    .ns-fee-list { display:grid; gap:.5rem; }
+    .ns-fee {
+        padding:.72rem .82rem; border:1px solid #e2e8f0; border-radius:.75rem; background:#fff;
+    }
+    .ns-fee__name { margin:0; font-size:.84rem; font-weight:800; color:var(--ink); }
+    .ns-fee__amount { color:#1d4ed8; }
+    .ns-fee__desc { margin:.28rem 0 0; font-size:.74rem; color:var(--muted); line-height:1.45; }
 </style>
 
 @if ($errors->any())
@@ -258,6 +277,9 @@
     $initialJournalId = $preselectedCall && $callJournalMap->has($preselectedCall)
         ? $callJournalMap[$preselectedCall]
         : '';
+    $feesByJournal = $feesByJournal ?? [];
+    $issuePublicationFeeByCall = $issuePublicationFeeByCall ?? [];
+    $guidelinesByCall = $guidelinesByCall ?? [];
 @endphp
 
 <div class="ns-alert">
@@ -289,6 +311,34 @@
         ),
         reviewTips: @js($reviewTips),
         callJournalMap: @js($callJournalMap),
+        feesByJournal: @js($feesByJournal),
+        issuePublicationFeeByCall: @js($issuePublicationFeeByCall),
+        guidelinesByCall: @js($guidelinesByCall),
+        get submissionFees() {
+            if (!this.journalId) return [];
+            return this.feesByJournal[this.journalId] || this.feesByJournal[String(this.journalId)] || [];
+        },
+        get requiredSubmissionFee() {
+            const paid = this.submissionFees.filter((fee) => Number(fee.amount) >= 1);
+            if (!paid.length) return null;
+            return paid.sort((a, b) => Number(a.amount) - Number(b.amount) || a.name.localeCompare(b.name))[0];
+        },
+        get requiresSubmissionPayment() {
+            return this.requiredSubmissionFee !== null;
+        },
+        get issuePublicationFee() {
+            if (!this.selectedCallId) return null;
+            return this.issuePublicationFeeByCall[this.selectedCallId]
+                || this.issuePublicationFeeByCall[String(this.selectedCallId)]
+                || null;
+        },
+        get guidelinesHtml() {
+            if (!this.selectedCallId) return '';
+            return this.guidelinesByCall[this.selectedCallId] || this.guidelinesByCall[String(this.selectedCallId)] || '';
+        },
+        get showGuidelines() {
+            return !!this.selectedCallId && (this.guidelinesHtml || this.submissionFees.length || this.issuePublicationFee);
+        },
         get categories() {
             if (!this.journalId) return [];
             return this.categoriesByJournal[this.journalId] || this.categoriesByJournal[String(this.journalId)] || [];
@@ -345,6 +395,60 @@
                     <input id="title" name="title" type="text" required value="{{ old('title') }}" class="mp-input" placeholder="Full article title" autofocus>
                     @error('title')<p class="mp-error">{{ $message }}</p>@enderror
                 </div>
+
+                <div class="mp-field" x-show="requiresSubmissionPayment" x-cloak>
+                    <x-form-label field="submission.fee">Submission fee</x-form-label>
+                    <div class="ns-fee ns-fee--required" style="margin-top:.15rem">
+                        <p class="ns-fee__name">
+                            <span x-text="requiredSubmissionFee?.name"></span>
+                            <span class="ns-fee__amount" x-text="requiredSubmissionFee ? ` — ${Number(requiredSubmissionFee.amount).toLocaleString()} ${requiredSubmissionFee.currency}` : ''"></span>
+                        </p>
+                        <p class="mp-hint" style="margin-top:.35rem">This journal requires payment when you submit to this call. After upload, you will be redirected to Paystack to complete checkout before editors receive your manuscript.</p>
+                    </div>
+                    <input type="hidden" name="journal_fee_id" :value="requiredSubmissionFee?.id || ''">
+                </div>
+            </div>
+        </section>
+
+        <section class="mp-card ns-guide-panel" x-show="showGuidelines" x-cloak>
+            <div class="mp-card__head">
+                <div>
+                    <h2 class="mp-card__title">Submission guidelines</h2>
+                    <p class="mp-card__desc">Requirements and fees for the selected call.</p>
+                </div>
+            </div>
+            <div class="mp-card__body" style="display:grid;gap:1rem">
+                <div class="ns-guide-prose tjs-prose" x-show="guidelinesHtml" x-html="guidelinesHtml"></div>
+
+                <div class="ns-fees" x-show="submissionFees.length || issuePublicationFee">
+                    <div x-show="submissionFees.length">
+                        <p class="ns-fee-group__label">Submission fees</p>
+                        <div class="ns-fee-list">
+                            <template x-for="fee in submissionFees" :key="'sub-' + fee.id">
+                                <article class="ns-fee">
+                                    <p class="ns-fee__name">
+                                        <span x-text="fee.name"></span>
+                                        <span class="ns-fee__amount" x-text="` — ${fee.amount.toLocaleString()} ${fee.currency}`"></span>
+                                    </p>
+                                    <p class="ns-fee__desc" x-show="fee.description" x-text="fee.description"></p>
+                                </article>
+                            </template>
+                        </div>
+                    </div>
+                    <div x-show="issuePublicationFee">
+                        <p class="ns-fee-group__label">Publication fee (APC)</p>
+                        <div class="ns-fee-list">
+                            <article class="ns-fee">
+                                <p class="ns-fee__name">
+                                    <span x-text="issuePublicationFee.name"></span>
+                                    <span class="ns-fee__amount" x-text="` — ${issuePublicationFee.amount.toLocaleString()} ${issuePublicationFee.currency}`"></span>
+                                </p>
+                                <p class="ns-fee__desc">Due after review and acceptance, before publication in the issue.</p>
+                                <p class="ns-fee__desc" x-show="issuePublicationFee.description" x-text="issuePublicationFee.description"></p>
+                            </article>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -358,7 +462,13 @@
             <div class="mp-card__body" style="display:grid;gap:.95rem">
                 <div class="mp-field">
                     <x-form-label for="abstract" field="submission.abstract">Abstract</x-form-label>
-                    <textarea id="abstract" name="abstract" rows="7" class="mp-textarea" placeholder="Summarize the problem, methods, and key findings…">{{ old('abstract') }}</textarea>
+                    <x-rich-text
+                        id="abstract"
+                        name="abstract"
+                        :value="old('abstract')"
+                        placeholder="Summarize the problem, methods, and key findings…"
+                        :rows="7"
+                    />
                     @error('abstract')<p class="mp-error">{{ $message }}</p>@enderror
                 </div>
 

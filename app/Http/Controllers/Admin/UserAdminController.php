@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Journal;
 use App\Models\User;
 use App\Support\JournalTeamRoles;
 use Illuminate\Http\RedirectResponse;
@@ -40,12 +41,19 @@ class UserAdminController extends Controller
             $query->whereDoesntHave('journals');
         }
 
+        $journalId = $request->get('journal_id');
+        if ($journalId && is_numeric($journalId)) {
+            $query->whereHas('journals', fn ($q) => $q->where('journals.id', (int) $journalId));
+        }
+
         $perPage = (int) $request->integer('per_page', 12);
         if (! in_array($perPage, [12, 24, 48], true)) {
             $perPage = 12;
         }
 
         $users = $query->paginate($perPage)->withQueryString();
+
+        $journals = Journal::query()->orderBy('title')->get(['id', 'title', 'slug', 'subtitle', 'issn']);
 
         $stats = [
             'total' => User::query()->count(),
@@ -55,7 +63,7 @@ class UserAdminController extends Controller
             'with_journals' => User::query()->whereHas('journals')->count(),
         ];
 
-        return view('admin.users.index', compact('users', 'stats', 'perPage', 'role', 'journalFilter'));
+        return view('admin.users.index', compact('users', 'stats', 'perPage', 'role', 'journalFilter', 'journalId', 'journals'));
     }
 
     public function show(User $user): View

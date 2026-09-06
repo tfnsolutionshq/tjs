@@ -78,6 +78,9 @@
         ->mapWithKeys(fn (string $key) => [$key => \App\Support\FormHelp::get('author.'.$key)])
         ->filter()
         ->all();
+
+    $articleFeesByJournal = $articleFeesByJournal ?? [];
+    $defaultJournalFeeId = old('journal_fee_id', isset($article) ? $article->journal_fee_id : '');
 @endphp
 
 <style>
@@ -623,6 +626,8 @@
         authorFieldHelp: @js($authorFieldHelp),
         priceAmount: @js(old('price_amount', $article->price_amount ?? '')),
         currency: @js(old('currency', $article->currency ?? 'NGN')),
+        articleFeesByJournal: @js($articleFeesByJournal),
+        journalFeeId: @js((string) $defaultJournalFeeId),
     })"
 >
     @csrf
@@ -924,7 +929,13 @@
                     </div>
                     <div class="af-field af-span-2">
                         <x-form-label for="abstract" field="article.abstract">Abstract</x-form-label>
-                        <textarea id="abstract" name="abstract" rows="5" class="af-textarea" x-ref="abstract">{{ old('abstract', $article->abstract ?? '') }}</textarea>
+                        <x-rich-text
+                            id="abstract"
+                            name="abstract"
+                            :value="old('abstract', $article->abstract ?? '')"
+                            placeholder="Summarize the work…"
+                            :rows="5"
+                        />
                         @error('abstract')<p class="af-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="af-field af-span-2">
@@ -1170,6 +1181,23 @@
                         <x-form-label for="doi" field="article.doi">DOI</x-form-label>
                         <input id="doi" name="doi" type="text" class="af-input" x-ref="doi"
                             value="{{ old('doi', $article->doi ?? '') }}" placeholder="10.xxxx/…">
+                        @isset($manageJournal)
+                            @if(isset($article) && $article->exists)
+                                <div style="margin-top:.55rem;display:flex;flex-wrap:wrap;gap:.45rem;align-items:center">
+                                    <form method="POST" action="{{ route('journal.manage.doi.deposit', [$manageJournal, $article]) }}">
+                                        @csrf
+                                        <button type="submit" class="admin-btn admin-btn-secondary" style="padding:.4rem .7rem;font-size:.75rem">
+                                            {{ $article->doi_deposit_status === 'deposited' ? 'Re-deposit DOI' : 'Deposit DOI' }}
+                                        </button>
+                                    </form>
+                                    <span style="font-size:.72rem;color:var(--muted)">Uses the saved DOI, or mints one if blank. Save the article first if you edited the DOI field.</span>
+                                    @if($article->doi_deposit_status)
+                                        <span style="font-size:.74rem;color:var(--muted);text-transform:capitalize">Status: {{ $article->doi_deposit_status }}</span>
+                                    @endif
+                                    <a href="{{ route('journal.manage.doi.index', $manageJournal) }}" style="font-size:.74rem;font-weight:700;color:#1d4ed8">DOI settings</a>
+                                </div>
+                            @endif
+                        @endisset
                     </div>
                     <div class="af-field">
                         <x-form-label for="license" field="article.license">License</x-form-label>
@@ -1257,6 +1285,17 @@
         </div>
 
                 <div class="af-field" style="margin-top:.85rem" x-show="visibility === 'paid'" x-cloak>
+                    <template x-if="articleFees.length > 0">
+                        <div class="af-field" style="margin-bottom:.85rem">
+                            <x-form-label for="journal_fee_id" field="article.fee">Fee catalog (optional)</x-form-label>
+                            <select id="journal_fee_id" name="journal_fee_id" class="af-select" x-model="journalFeeId" @change="applyArticleFee()">
+                                <option value="">Custom price</option>
+                                <template x-for="fee in articleFees" :key="fee.id">
+                                    <option :value="fee.id" x-text="`${fee.name} — ${fee.amount.toLocaleString()} ${fee.currency}`"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </template>
                     <x-form-label for="price_amount" field="article.price_amount" :required="true" reqClass="af-req">Price</x-form-label>
                     <div class="af-price">
                         <div class="af-price__currency">
@@ -1447,6 +1486,17 @@ function articleForm(cfg) {
             if (!this.journalId) return [];
             return this.categories.filter((c) => String(c.journal_id) === String(this.journalId));
         },
+        get articleFees() {
+            if (!this.journalId) return [];
+            return this.articleFeesByJournal[this.journalId] || this.articleFeesByJournal[String(this.journalId)] || [];
+        },
+        applyArticleFee() {
+            const fee = this.articleFees.find((f) => String(f.id) === String(this.journalFeeId));
+            if (fee) {
+                this.priceAmount = fee.amount;
+                this.currency = fee.currency || 'NGN';
+            }
+        },
         extractFile: null,
         extractName: '',
         galleyName: '',
@@ -1464,6 +1514,8 @@ function articleForm(cfg) {
         authorFieldHelp: cfg.authorFieldHelp || {},
         priceAmount: cfg.priceAmount ?? '',
         currency: (cfg.currency || 'NGN').toUpperCase(),
+        articleFeesByJournal: cfg.articleFeesByJournal || {},
+        journalFeeId: cfg.journalFeeId ? String(cfg.journalFeeId) : '',
         currencyMeta: {
             NGN: { flag: 'ng', symbol: '₦', label: 'Naira' },
             USD: { flag: 'us', symbol: '$', label: 'US Dollar' },
@@ -1936,10 +1988,38 @@ function articleForm(cfg) {
         },
 
         fillField(ref, value) {
-            if (!value || !this.$refs[ref]) return;
-            this.$refs[ref].value = value;
-            this.$refs[ref].classList.add('is-filled');
-            setTimeout(() => this.$refs[ref]?.classList.remove('is-filled'), 1800);
+            if (!value) return;
+            const el = this.$refs[ref] || document.getElementById(ref);
+            if (!el) return;
+
+            const rt = el.classList?.contains('tjs-rt')
+                ? el
+                : el.closest?.('.tjs-rt');
+            if (rt) {
+                const editor = rt.querySelector('.tjs-rt__editor');
+                const input = rt.querySelector('textarea.tjs-rt__input');
+                const plain = String(value);
+                const html = /<[a-z][\s\S]*>/i.test(plain)
+                    ? plain
+                    : '<p>' + plain
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/\n\n+/g, '</p><p>')
+                        .replace(/\n/g, '<br>') + '</p>';
+                if (editor) {
+                    editor.innerHTML = html;
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                if (input) input.value = editor ? editor.innerHTML : html;
+                rt.classList.add('is-filled');
+                setTimeout(() => rt.classList.remove('is-filled'), 1800);
+                return;
+            }
+
+            el.value = value;
+            el.classList.add('is-filled');
+            setTimeout(() => el.classList?.remove('is-filled'), 1800);
         },
 
         async runExtract() {

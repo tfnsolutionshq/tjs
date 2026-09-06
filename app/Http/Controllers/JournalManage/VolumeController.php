@@ -22,24 +22,12 @@ class VolumeController extends Controller
 
     public function index(Journal $journal): View
     {
-        $volumes = $journal->volumes()
-            ->with(['issues' => fn ($q) => $q->orderBy('issue_number')])
-            ->withCount('issues')
-            ->orderByDesc('year')
-            ->orderByDesc('volume_number')
-            ->get();
+        $request = request();
+        $request->attributes->set('manage_journal', $journal);
 
-        $stats = [
-            'volumes' => $volumes->count(),
-            'issues' => $volumes->sum('issues_count'),
-            'published' => $volumes->where('status', 'published')->count(),
-            'draft' => $volumes->where('status', 'draft')->count(),
-        ];
-
-        $manageJournal = $journal;
-        $canMutate = $journal->userMayMutate(auth()->user());
-
-        return view('admin.volumes.index', compact('journal', 'volumes', 'stats', 'manageJournal', 'canMutate'));
+        return $this->volumes->index($journal)->with([
+            'manageJournal' => $journal,
+        ]);
     }
 
     public function store(Request $request, Journal $journal): RedirectResponse

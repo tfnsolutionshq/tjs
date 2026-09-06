@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Portal | '.config('tjs.name'))</title>
+    @include('seo.portal-head')
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800|libre-baskerville:400,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -208,6 +209,12 @@
         .admin-btn-secondary {
             background: #fff; color: var(--ink); border: 1px solid var(--line);
         }
+        .admin-btn-ghost {
+            background: transparent;
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+        .admin-btn-ghost:hover { background: #f8fafc; }
 
         .admin-content { flex: 1; padding: .35rem 1rem 1.75rem; }
         @media (min-width: 640px) { .admin-content { padding: .25rem 1.5rem 2rem; } }
@@ -517,8 +524,11 @@
         @media (min-width: 960px) { .mp-grid--2 { grid-template-columns: 1.2fr .8fr; align-items: start; } }
         .mp-card {
             background: #fff; border: 1px solid var(--line); border-radius: 1.05rem;
-            box-shadow: 0 8px 24px rgba(15,23,42,.035); overflow: hidden;
+            box-shadow: 0 8px 24px rgba(15,23,42,.035); overflow: visible;
         }
+        .mp-card__head,
+        .mp-card__body { position: relative; }
+        .mp-field { overflow: visible; }
         .mp-card__head {
             display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .65rem;
             padding: 1.05rem 1.15rem .15rem;
@@ -554,8 +564,11 @@
             text-transform: uppercase; padding: .22rem .5rem; border-radius: 999px; background: #eef4fc; color: #255ea8;
         }
         .mp-badge--submitted, .mp-badge--under_review, .mp-badge--resubmitted { background: #eff6ff; color: #1d4ed8; }
+        .mp-badge--fee_pending, .mp-badge--publication_fee_pending { background: #fef3c7; color: #b45309; }
+        .mp-badge--ready_for_production, .mp-badge--in_production { background: #fef3c7; color: #b45309; }
+        .mp-badge--ready_to_publish { background: #dbeafe; color: #1d4ed8; }
         .mp-badge--revision_requested { background: #fff7ed; color: #c2410c; }
-        .mp-badge--accepted, .mp-badge--published { background: #ecfdf5; color: #047857; }
+        .mp-badge--accepted, .mp-badge--approved, .mp-badge--published { background: #ecfdf5; color: #047857; }
         .mp-badge--rejected { background: #fef2f2; color: #b91c1c; }
         .mp-badge--platform { background: #ecfdf5; color: #047857; }
         .mp-badge--journal { background: #eef4fc; color: #255ea8; }
@@ -609,8 +622,8 @@
 @php
     $mpUser = auth()->user();
     $showReviews = $mpUser && $mpUser->canAccessReviewQueue();
+    $showProduction = $mpUser && $mpUser->canAccessProductionQueue();
     $mpManaged = $mpUser?->managedJournals() ?? collect();
-    $mpStaff = $mpUser?->staffJournals() ?? collect();
 @endphp
     <div class="admin-shell">
         <div class="admin-overlay" :class="{ 'is-open': sidebarOpen }" @click="sidebarOpen = false"></div>
@@ -631,48 +644,52 @@
                 <p class="admin-nav__label">Publishing</p>
                 <a href="{{ route('author.submissions.index') }}" @class(['is-active' => request()->routeIs('author.submissions.index', 'author.submissions.show')]) @click="sidebarOpen = false">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
-                    My submissions
+                    My Submissions
                     @if(($memberOpenSubmissions ?? 0) > 0)
                         <span class="admin-nav__badge">{{ $memberOpenSubmissions > 99 ? '99+' : $memberOpenSubmissions }}</span>
                     @endif
                 </a>
                 <a href="{{ route('author.submissions.create') }}" @class(['is-active' => request()->routeIs('author.submissions.create')]) @click="sidebarOpen = false">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-                    New submission
+                    New Submission
                 </a>
                 @if($showReviews)
                     <a href="{{ route('reviewer.reviews.index') }}" @class(['is-active' => request()->routeIs('reviewer.*')]) @click="sidebarOpen = false">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
-                        Review queue
+                        Review Queue
                         @if(($memberOpenReviews ?? 0) > 0)
                             <span class="admin-nav__badge">{{ $memberOpenReviews > 99 ? '99+' : $memberOpenReviews }}</span>
+                        @endif
+                    </a>
+                @endif
+                @if($showProduction)
+                    <a href="{{ route('production.queue.index') }}" @class(['is-active' => request()->routeIs('production.queue.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+                        Production Queue
+                        @if(($memberOpenProduction ?? 0) > 0)
+                            <span class="admin-nav__badge">{{ $memberOpenProduction > 99 ? '99+' : $memberOpenProduction }}</span>
                         @endif
                     </a>
                 @endif
 
                 @if($mpManaged->isNotEmpty() || $mpUser?->canAccessPlatformAdmin())
                     <p class="admin-nav__label">Journal teams</p>
-                    @foreach($mpManaged->take(6) as $managed)
-                        <a href="{{ route('journal.manage.dashboard', $managed) }}" @click="sidebarOpen = false">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
-                            <span class="truncate">{{ $managed->title }}</span>
-                        </a>
-                    @endforeach
+                    <a href="{{ route('member.journals.create') }}" @class(['is-active' => request()->routeIs('member.journals.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                        Create Journal
+                    </a>
                     @if($mpUser?->canAccessPlatformAdmin())
                         <a href="{{ route('admin.dashboard') }}" @click="sidebarOpen = false">
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
-                            Platform admin
+                            Platform Admin
                         </a>
                     @endif
-                @elseif($mpStaff->isNotEmpty())
-                    <p class="admin-nav__label">Journal teams</p>
-                    @foreach($mpStaff->take(6) as $staffJournal)
-                        @php($staffRole = $mpUser->journalTeamRole($staffJournal))
-                        <a href="{{ route('journals.show', $staffJournal) }}" @click="sidebarOpen = false" target="_blank" rel="noopener">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
-                            <span class="truncate">{{ $staffJournal->title }}{{ $staffRole ? ' · '.\App\Support\JournalTeamRoles::label($staffRole) : '' }}</span>
-                        </a>
-                    @endforeach
+                @else
+                    <p class="admin-nav__label">Publisher</p>
+                    <a href="{{ route('member.journals.create') }}" @class(['is-active' => request()->routeIs('member.journals.*')]) @click="sidebarOpen = false">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                        Create Journal
+                    </a>
                 @endif
 
                 <p class="admin-nav__label">Access</p>
@@ -680,9 +697,13 @@
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4.5 20.2a7.5 7.5 0 0115 0"/></svg>
                     Memberships
                 </a>
+                <a href="{{ route('payments.index') }}" @class(['is-active' => request()->routeIs('payments.index') || request()->routeIs('payments.receipt')]) @click="sidebarOpen = false">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 7.5h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1v-11z"/><path d="M8 7.5V6a2 2 0 012-2h4a2 2 0 012 2v1.5M8 12h.01M12 12h.01M16 12h.01"/></svg>
+                    My Payments
+                </a>
                 <a href="{{ route('journals.index') }}" @click="sidebarOpen = false" target="_blank" rel="noopener">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
-                    Browse journals
+                    Browse Journals
                 </a>
 
                 <p class="admin-nav__label">Account</p>
@@ -692,7 +713,7 @@
                 </a>
                 <a href="{{ route('home') }}" @click="sidebarOpen = false">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M14 5h5v5"/><path d="M10 14L19 5"/><path d="M19 13.5V18a1 1 0 01-1 1H6a1 1 0 01-1-1V6a1 1 0 011-1h4.5"/></svg>
-                    Public site
+                    Public Site
                 </a>
             </nav>
 
@@ -724,7 +745,7 @@
                     @csrf
                     <button type="submit" class="admin-logout">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H9"/></svg>
-                        Log out
+                        Log Out
                     </button>
                 </form>
             </div>

@@ -147,7 +147,10 @@ class JournalAccessAndSeoTest extends TestCase
 
     public function test_paystack_webhook_signature_validation(): void
     {
-        config(['paystack.secret_key' => 'sk_test_secret']);
+        config([
+            'paystack.secret_key' => 'sk_test_secret',
+            'paystack.webhook_secret' => 'sk_test_secret',
+        ]);
         $service = app(PaystackService::class);
         $body = '{"event":"charge.success"}';
         $sig = hash_hmac('sha512', $body, 'sk_test_secret');
@@ -160,5 +163,101 @@ class JournalAccessAndSeoTest extends TestCase
     {
         $this->seedArticle('open');
         $this->get(route('sitemap'))->assertOk();
+    }
+
+    public function test_platform_sitemap_is_not_empty(): void
+    {
+        ['journal' => $journal] = $this->seedArticle('open');
+
+        $this->get(route('sitemap'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
+            ->assertSee(route('sitemap.site'), false)
+            ->assertSee(route('sitemap.journal', $journal), false);
+
+        $this->get(route('sitemap.site'))
+            ->assertOk()
+            ->assertSee(route('home'), false)
+            ->assertSee(route('journals.index'), false);
+    }
+
+    public function test_journal_sitemap_lists_catalog_and_article_urls(): void
+    {
+        ['journal' => $journal, 'article' => $article] = $this->seedArticle('open');
+
+        $this->get(route('sitemap.journal', $journal))
+            ->assertOk()
+            ->assertSee(route('journals.show', $journal), false)
+            ->assertSee(route('journals.about', $journal), false)
+            ->assertSee(route('journals.browse', $journal), false)
+            ->assertSee(route('journals.articles.show', [$journal, $article]), false)
+            ->assertSee(route('journals.articles.pdf', [$journal, $article->slug]), false);
+    }
+
+    public function test_journal_pages_include_indexable_metadata(): void
+    {
+        ['journal' => $journal, 'article' => $article] = $this->seedArticle('open');
+
+        $this->get(route('journals.about', $journal))
+            ->assertOk()
+            ->assertSee('name="citation_journal_title"', false)
+            ->assertSee('name="robots"', false)
+            ->assertSee('Periodical', false);
+
+        $this->get(route('journals.articles.show', [$journal, $article]))
+            ->assertOk()
+            ->assertSee('name="citation_title"', false)
+            ->assertSee('name="citation_abstract_html_url"', false);
+    }
+
+    public function test_platform_and_journal_branding_and_indexing_split(): void
+    {
+        Storage::fake('public');
+
+        ['journal' => $journal] = $this->seedArticle('open');
+        $journal->update([
+            'logo_path' => 'journals/demo-journal/branding/logo.png',
+            'logo_disk' => 'public',
+        ]);
+        Storage::disk('public')->put('journals/demo-journal/branding/logo.png', 'fake-logo');
+
+        $platformIcon = asset(config('tjs.brand_icon'));
+        $journalIcon = $journal->fresh()->logoUrl();
+        $this->assertNotNull($journalIcon);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.$platformIcon.'"', false)
+            ->assertSee('content="index,follow', false)
+            ->assertSee('application-name" content="'.config('tjs.full_name').'"', false)
+            ->assertDontSee('rel="icon" href="'.$journalIcon.'"', false);
+
+        $user = User::factory()->create(['role' => 'member']);
+        $this->actingAs($user)
+            ->get(route('memberships.index'))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.$platformIcon.'"', false)
+            ->assertSee('content="noindex,nofollow"', false)
+            ->assertSee('application-name" content="'.config('tjs.full_name').'"', false);
+
+        $this->get(route('journals.show', $journal))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.$journalIcon.'"', false)
+            ->assertSee('content="index,follow', false)
+            ->assertSee('application-name" content="Demo Journal"', false)
+            ->assertDontSee('rel="icon" href="'.$platformIcon.'"', false);
+
+        auth()->logout();
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.$platformIcon.'"', false)
+            ->assertSee('content="noindex,nofollow"', false);
+
+        $this->get(route('journals.login', $journal))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.$journalIcon.'"', false)
+            ->assertSee('content="noindex,nofollow"', false)
+            ->assertSee('application-name" content="Demo Journal"', false);
     }
 }

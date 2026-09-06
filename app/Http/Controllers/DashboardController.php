@@ -15,10 +15,9 @@ class DashboardController extends Controller
     public function __invoke(Request $request): View|RedirectResponse
     {
         $user = $request->user();
-        $home = $user->homeRouteName();
 
-        if ($home !== 'dashboard') {
-            return redirect()->route($home, $user->homeRouteParameters());
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard');
         }
 
         $submissionBase = Submission::query()->where('author_id', $user->id);
@@ -35,6 +34,7 @@ class DashboardController extends Controller
                 ->where('starts_at', '<=', now())
                 ->where('ends_at', '>=', now())
                 ->count(),
+            'journals' => $user->managedJournals()->count(),
         ];
 
         $recentSubmissions = Submission::query()
@@ -61,6 +61,9 @@ class DashboardController extends Controller
             ->get();
 
         $reviewerRequestJournals = app(ReviewerRequestService::class)->memberJournalContexts($user);
+        $managedJournals = $user->managedJournals();
+        $managedJournalsPreview = $managedJournals->take(3);
+        $managedJournalsTotal = $managedJournals->count();
 
         return view('dashboard', compact(
             'stats',
@@ -68,6 +71,9 @@ class DashboardController extends Controller
             'activeMemberships',
             'membershipPlans',
             'reviewerRequestJournals',
+            'managedJournals',
+            'managedJournalsPreview',
+            'managedJournalsTotal',
         ));
     }
 }

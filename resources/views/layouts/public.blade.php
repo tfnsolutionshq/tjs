@@ -7,8 +7,11 @@
     <title>@yield('title', config('tjs.full_name'))</title>
     <meta name="description" content="@yield('meta_description', config('tjs.organization').' — scholarly journals platform.')">
     <link rel="canonical" href="@yield('canonical', url()->current())">
-    <link rel="icon" href="{{ asset('images/tfns-logo.jpeg') }}" sizes="any">
-    <link rel="apple-touch-icon" href="{{ asset('images/tfns-logo.jpeg') }}">
+    <link rel="sitemap" type="application/xml" title="{{ config('tjs.full_name') }}" href="{{ route('sitemap') }}">
+    <meta name="robots" content="@yield('robots', 'index,follow,max-image-preview:large')">
+    <meta name="application-name" content="{{ config('tjs.full_name') }}">
+    <meta name="apple-mobile-web-app-title" content="{{ config('tjs.name') }}">
+    @include('seo.brand-icons')
     @yield('seo')
     @stack('meta')
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -204,14 +207,14 @@
 
                 <nav class="hidden items-center gap-6 md:flex">
                     <a href="{{ route('journals.index') }}">Journals</a>
-                    <a href="{{ route('home') }}#features">Platform</a>
+                    <a href="{{ route('home') }}#platform">Platform</a>
                     <a href="{{ route('home') }}#latest">Articles</a>
                     @auth
                         <a href="{{ route('dashboard') }}">Dashboard</a>
                         @if(auth()->user()->isAdmin())
                             <a href="{{ route('admin.dashboard') }}">Admin</a>
                         @elseif(auth()->user()->managedJournals()->isNotEmpty())
-                            <a href="{{ route('journal.manage.dashboard', auth()->user()->managedJournals()->first()) }}">Manage journal</a>
+                            <a href="{{ route('journal.manage.dashboard', auth()->user()->managedJournals()->first()) }}">Manage Journal</a>
                         @endif
                     @endauth
                 </nav>
@@ -221,11 +224,11 @@
                         <a href="{{ route('author.submissions.index') }}" class="hidden text-sm sm:inline @if(request()->routeIs('author.*')) !text-white @endif">Submissions</a>
                         <a href="{{ route('profile.edit') }}" class="hidden text-sm sm:inline @if(request()->routeIs('profile.*')) !text-white @endif">Profile</a>
                         <form method="POST" action="{{ route('logout') }}">@csrf
-                            <button type="submit" class="btn btn-ghost !py-2 !px-3 text-sm">Log out</button>
+                            <button type="submit" class="btn btn-ghost !py-2 !px-3 text-sm">Log Out</button>
                         </form>
                     @else
                         <a href="{{ route('login') }}" class="btn btn-green !py-2 !px-3.5 text-sm">Login</a>
-                        <a href="{{ route('register') }}" class="btn btn-ghost !py-2 !px-3.5 text-sm hidden sm:inline-flex">Sign up</a>
+                        <a href="{{ route('register') }}" class="btn btn-ghost !py-2 !px-3.5 text-sm hidden sm:inline-flex">Sign Up</a>
                     @endauth
                 </div>
             </div>
@@ -239,7 +242,7 @@
             >
                 <ul class="site-nav__sheet-list">
                     <li><a class="site-nav__sheet-link @if(request()->routeIs('journals.*')) is-active @endif" href="{{ route('journals.index') }}" @click="navOpen = false">Journals</a></li>
-                    <li><a class="site-nav__sheet-link" href="{{ route('home') }}#features" @click="navOpen = false">Platform</a></li>
+                    <li><a class="site-nav__sheet-link" href="{{ route('home') }}#platform" @click="navOpen = false">Platform</a></li>
                     <li><a class="site-nav__sheet-link" href="{{ route('home') }}#latest" @click="navOpen = false">Articles</a></li>
                     @auth
                         <li><a class="site-nav__sheet-link @if(request()->routeIs('dashboard')) is-active @endif" href="{{ route('dashboard') }}" @click="navOpen = false">Dashboard</a></li>
@@ -250,7 +253,7 @@
                         @if(auth()->user()->isAdmin())
                             <li><a class="site-nav__sheet-link" href="{{ route('admin.dashboard') }}" @click="navOpen = false">Admin</a></li>
                         @elseif(auth()->user()->managedJournals()->isNotEmpty())
-                            <li><a class="site-nav__sheet-link" href="{{ route('journal.manage.dashboard', auth()->user()->managedJournals()->first()) }}" @click="navOpen = false">Manage journal</a></li>
+                            <li><a class="site-nav__sheet-link" href="{{ route('journal.manage.dashboard', auth()->user()->managedJournals()->first()) }}" @click="navOpen = false">Manage Journal</a></li>
                         @endif
                         <li><a class="site-nav__sheet-link @if(request()->routeIs('profile.*')) is-active @endif" href="{{ route('profile.edit') }}" @click="navOpen = false">Profile</a></li>
                     @endauth
@@ -258,11 +261,11 @@
                 <div class="site-nav__sheet-actions">
                     @auth
                         <form method="POST" action="{{ route('logout') }}" class="w-full">@csrf
-                            <button type="submit" class="btn btn-ghost !py-2.5 w-full text-sm">Log out</button>
+                            <button type="submit" class="btn btn-ghost !py-2.5 w-full text-sm">Log Out</button>
                         </form>
                     @else
                         <a href="{{ route('login') }}" class="btn btn-green !py-2.5 flex-1 text-sm" @click="navOpen = false">Login</a>
-                        <a href="{{ route('register') }}" class="btn btn-ghost !py-2.5 flex-1 text-sm" @click="navOpen = false">Sign up</a>
+                        <a href="{{ route('register') }}" class="btn btn-ghost !py-2.5 flex-1 text-sm" @click="navOpen = false">Sign Up</a>
                     @endauth
                 </div>
             </div>
@@ -297,7 +300,15 @@
         <div class="border-t border-white/10">
             <div class="container-x flex flex-col gap-2 py-4 text-xs sm:flex-row sm:justify-between">
                 <p>&copy; {{ date('Y') }} {{ config('tjs.organization') }}</p>
-                <p>Built for scholarly publishing</p>
+                <p>
+                    Developed by
+                    <a
+                        href="{{ config('tjs.developer_url') }}"
+                        class="text-white hover:underline font-semibold"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >{{ config('tjs.developer_name') }}</a>
+                </p>
             </div>
         </div>
     </footer>

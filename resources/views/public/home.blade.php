@@ -1,7 +1,15 @@
 @extends('layouts.public')
 
 @section('title', config('tjs.full_name').' | '.config('tjs.organization'))
-@section('meta_description', 'Modernize your journal publishing process with TFN Journal System.')
+@section('meta_description', config('tjs.pitch') ?: config('tjs.tagline') ?: ('Modernize your journal publishing process with '.config('tjs.full_name').'.'))
+@section('canonical', route('home'))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->site(
+        config('tjs.full_name').' | '.config('tjs.organization'),
+        config('tjs.pitch') ?: config('tjs.tagline'),
+        route('home')
+    )])
+@endsection
 
 @section('content')
 {{-- Hero — editorial illustration background --}}
@@ -18,11 +26,14 @@
     ></div>
     <div class="container-x relative grid items-center py-14 lg:min-h-[28rem] lg:py-20">
         <div class="max-w-xl">
-            <h1 class="tjs-reveal tjs-serif text-[2.15rem] font-bold leading-[1.15] text-[#1c2430] sm:text-5xl" style="--reveal-delay:40ms">
-                Modernize your journal publishing process. Further your mission.
+            <p class="tjs-reveal text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue);--reveal-delay:20ms">
+                {{ config('tjs.full_name') }}
+            </p>
+            <h1 class="tjs-reveal tjs-serif mt-3 text-[2.15rem] font-bold leading-[1.15] text-[#1c2430] sm:text-5xl" style="--reveal-delay:40ms">
+                A modern publishing solution for anyone who publishes.
             </h1>
             <p class="tjs-reveal mt-5 max-w-xl text-base leading-relaxed sm:text-lg" style="color:var(--muted);--reveal-delay:120ms">
-                TJS gives {{ config('tjs.organization') }} multi-journal websites, peer review, APA citations, and access-controlled full text — with branding themes for every journal.
+                {{ config('tjs.pitch') ?: ('TJS gives '.config('tjs.organization').' multi-journal websites, peer review, APA citations, and access-controlled full text — with branding themes for every journal.') }}
             </p>
             <div class="tjs-reveal mt-8 flex flex-wrap gap-3" style="--reveal-delay:200ms">
                 <a href="{{ route('journals.index') }}" class="btn btn-blue">Browse journals</a>
@@ -31,6 +42,23 @@
                 @else
                     <a href="{{ route('author.submissions.create') }}" class="btn btn-outline">Submit a manuscript</a>
                 @endguest
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- Major product description (lead-approved) --}}
+<section id="platform" class="border-b border-slate-200/80 bg-white">
+    <div class="container-x py-14 lg:py-16">
+        <div class="tjs-reveal mx-auto max-w-3xl">
+            <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">About TJS</p>
+            <h2 class="tjs-serif mt-2 text-3xl font-bold text-slate-900">Built to simplify, professionalize, and scale publishing</h2>
+            <div class="mt-5 space-y-4 text-base leading-relaxed" style="color:var(--muted)">
+                @foreach(preg_split("/\n\s*\n/", trim((string) config('tjs.description'))) as $para)
+                    @if(filled($para))
+                        <p>{{ $para }}</p>
+                    @endif
+                @endforeach
             </div>
         </div>
     </div>

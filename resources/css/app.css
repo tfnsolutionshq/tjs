@@ -343,6 +343,424 @@
         height: 1.1rem;
         flex-shrink: 0;
     }
+
+    /* Portal native selects (filters, forms) — custom chevron, not browser default */
+    .admin-body .admin-main select:not([multiple]):not(.tjs-select--native) {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%2364748b' stroke-width='1.75'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.7rem center;
+        background-size: 1rem 1rem;
+        padding-right: 2.35rem;
+        cursor: pointer;
+        line-height: 1.35;
+        min-height: 2.35rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .admin-body .admin-main select:not([multiple]):not(.tjs-select--native):hover {
+        border-color: #cbd5e1;
+    }
+
+    .admin-body .admin-main select:not([multiple]):not(.tjs-select--native):focus {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        outline: none;
+    }
+
+    .admin-body .admin-main select:not([multiple]):not(.tjs-select--native):disabled {
+        background-color: #f8fafc;
+        color: #94a3b8;
+        cursor: not-allowed;
+    }
+
+    /* Filter bar pill selects */
+    .admin-body .admin-main .aa-select,
+    .admin-body .admin-main .asub-select,
+    .admin-body .admin-main .jb-select,
+    .admin-body .admin-main .jaf-select,
+    .admin-body .admin-main .au-select,
+    .admin-body .admin-main .amp-select,
+    .admin-body .admin-main .as-select {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        background-color: #fff;
+    }
+
+    /* Custom TJS select (replaces native dropdown menus in filters) */
+    .tjs-select {
+        position: relative;
+        min-width: 0;
+        z-index: 1;
+    }
+
+    .tjs-select:focus-within,
+    .tjs-select:has(.tjs-select__menu:not([style*='display: none'])) {
+        z-index: 40;
+    }
+
+    .tjs-select__trigger {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.55rem;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        border-radius: 0.75rem;
+        padding: 0.62rem 0.75rem;
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+    }
+
+    .tjs-select__trigger:hover {
+        border-color: #cbd5e1;
+    }
+
+    .tjs-select__trigger:focus {
+        outline: none;
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .tjs-select--pill .tjs-select__trigger {
+        border-radius: 999px;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #64748b;
+    }
+
+    .tjs-select--pill .tjs-select__trigger:hover,
+    .tjs-select--pill:focus-within .tjs-select__trigger {
+        color: #0f172a;
+    }
+
+    .tjs-select__label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tjs-select__trigger-main {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .tjs-select__trigger-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .tjs-select__trigger-icon,
+    .tjs-select__option-icon {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        line-height: 0;
+    }
+
+    .tjs-select__trigger-icon .currency-icon svg,
+    .tjs-select__option-icon .currency-icon svg {
+        display: block;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+
+    .tjs-select__trigger-hint {
+        display: block;
+        margin-top: 0.1rem;
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tjs-select__option-main {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .tjs-select__option-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .tjs-select__option-hint {
+        display: block;
+        margin-top: 0.14rem;
+        font-size: 0.72rem;
+        font-weight: 500;
+        line-height: 1.35;
+        color: #64748b;
+        white-space: normal;
+    }
+
+    .tjs-select__option.is-selected .tjs-select__option-hint {
+        color: #3b82f6;
+    }
+
+    .tjs-select--rich .tjs-select__option {
+        align-items: flex-start;
+        padding-top: 0.62rem;
+        padding-bottom: 0.62rem;
+    }
+
+    .tjs-select__chevron {
+        width: 1rem;
+        height: 1rem;
+        color: #94a3b8;
+        flex-shrink: 0;
+        transition: transform 0.15s ease;
+    }
+
+    .tjs-select__chevron.is-open {
+        transform: rotate(180deg);
+    }
+
+    .tjs-select__menu {
+        position: absolute;
+        z-index: 50;
+        left: 0;
+        top: calc(100% + 0.35rem);
+        width: max(100%, 11rem);
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.8rem;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+        overflow: hidden;
+    }
+
+    .tjs-select__list {
+        max-height: 16rem;
+        overflow: auto;
+        padding: 0.35rem;
+    }
+
+    .tjs-select__option {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        border-radius: 0.55rem;
+        padding: 0.55rem 0.65rem;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .tjs-select__option:hover,
+    .tjs-select__option.is-hot {
+        background: #f8fafc;
+        color: #0f172a;
+    }
+
+    .tjs-select__option.is-selected {
+        background: #eff6ff;
+        color: #1d4ed8;
+        box-shadow: inset 0 0 0 1px #bfdbfe;
+    }
+
+    .tjs-select__option-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .tjs-select__check {
+        width: 0.95rem;
+        height: 0.95rem;
+        flex-shrink: 0;
+        color: #2563eb;
+    }
+
+    .tjs-select-enter {
+        transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+
+    .tjs-select-enter-from,
+    .tjs-select-leave-to {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    .tjs-select-enter-to,
+    .tjs-select-leave-from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .tjs-select-leave {
+        transition: opacity 0.1s ease, transform 0.1s ease;
+    }
+
+    .asub-filters .tjs-select--pill,
+    .amp-filters .tjs-select--pill {
+        max-width: 14rem;
+    }
+
+    .aa-perpage .tjs-select {
+        width: auto;
+        min-width: 4.5rem;
+    }
+
+    .tjs-rt {
+        border: 1px solid var(--line, #e2e8f0);
+        border-radius: 0.75rem;
+        background: #fff;
+        overflow: hidden;
+        position: relative;
+    }
+    .tjs-rt:focus-within {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+    .tjs-rt__toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid var(--line, #e2e8f0);
+        background: #f8fafc;
+    }
+    .tjs-rt__btn {
+        border: 0;
+        background: transparent;
+        border-radius: 0.45rem;
+        padding: 0.3rem 0.5rem;
+        font: inherit;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        line-height: 1.2;
+    }
+    .tjs-rt__btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+    .tjs-rt__sep {
+        width: 1px;
+        align-self: stretch;
+        margin: 0.15rem 0.2rem;
+        background: #e2e8f0;
+    }
+    .tjs-rt__editor {
+        padding: 0.75rem 0.9rem;
+        min-height: 8rem;
+        font: inherit;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: var(--ink, #0f172a);
+        outline: none;
+        overflow-y: auto;
+    }
+    .tjs-rt__editor[data-empty="true"]:before {
+        content: attr(aria-placeholder);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .tjs-rt__editor p { margin: 0 0 0.65em; }
+    .tjs-rt__editor p:last-child { margin-bottom: 0; }
+    .tjs-rt__editor ul,
+    .tjs-rt__editor ol { margin: 0.35em 0 0.65em; padding-left: 1.35rem; }
+    .tjs-rt__editor ul { list-style-type: disc; }
+    .tjs-rt__editor ol { list-style-type: decimal; }
+    .tjs-rt__editor ul ul { list-style-type: circle; }
+    .tjs-rt__editor ol ol { list-style-type: lower-alpha; }
+    .tjs-rt__editor li { display: list-item; margin: 0.2em 0; }
+    .tjs-rt__editor h2,
+    .tjs-rt__editor h3 {
+        margin: 0.75em 0 0.4em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+    }
+    .tjs-rt__editor h2 { font-size: 1.15rem; }
+    .tjs-rt__editor h3 { font-size: 1.02rem; }
+    .tjs-rt__editor blockquote {
+        margin: 0.5em 0;
+        padding: 0.15rem 0 0.15rem 0.85rem;
+        border-left: 3px solid #93c5fd;
+        color: #475569;
+    }
+    .tjs-rt__editor a { color: #1d4ed8; font-weight: 600; }
+    .tjs-rt__input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .tjs-prose {
+        font-size: 0.95rem;
+        line-height: 1.7;
+        color: inherit;
+    }
+    .tjs-prose > *:first-child { margin-top: 0; }
+    .tjs-prose > *:last-child { margin-bottom: 0; }
+    .tjs-prose p { margin: 0 0 0.85em; }
+    .tjs-prose ul,
+    .tjs-prose ol { margin: 0.35em 0 0.85em; padding-left: 1.35rem; }
+    .tjs-prose ul { list-style-type: disc; }
+    .tjs-prose ol { list-style-type: decimal; }
+    .tjs-prose ul ul { list-style-type: circle; }
+    .tjs-prose ol ol { list-style-type: lower-alpha; }
+    .tjs-prose li { display: list-item; margin: 0.2em 0; }
+    .tjs-prose h2,
+    .tjs-prose h3 {
+        margin: 1em 0 0.4em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+        color: inherit;
+    }
+    .tjs-prose h2 { font-size: 1.2rem; }
+    .tjs-prose h3 { font-size: 1.05rem; }
+    .tjs-prose blockquote {
+        margin: 0.75em 0;
+        padding: 0.2rem 0 0.2rem 0.9rem;
+        border-left: 3px solid #93c5fd;
+        color: #475569;
+    }
+    .tjs-prose a {
+        color: #1d4ed8;
+        font-weight: 650;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .tjs-prose strong { font-weight: 750; }
 }
 
 @keyframes tjs-alert-progress {

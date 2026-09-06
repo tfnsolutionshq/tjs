@@ -64,7 +64,7 @@ final class FormHelp
         'journal.accent_color' => 'Brand color for buttons, links, and accents on the public journal site.',
         'journal.theme' => 'Visual layout preset for the public journal pages.',
         'journal.status' => 'Inactive journals are hidden from public listings and submission pickers.',
-        'journal.featured' => 'Featured journals are highlighted on the platform homepage.',
+        'journal.featured' => 'Featured journals are highlighted on the platform homepage. Only platform administrators can enable this.',
         'journal.platform_admin_edits' => 'When on, platform administrators can edit this journal from the platform admin portal.',
         'journal.show_subtitle_in_header' => 'Shows the subtitle under the journal title on the public site header.',
         'journal.assign_admin_now' => 'Create or assign a journal admin during setup. You can also do this later.',
@@ -73,7 +73,7 @@ final class FormHelp
         'journal.team_mode' => 'Add an existing platform user or create a new account for the team member.',
         'journal.team_email' => 'Login email for the new team member account.',
         'journal.team_name' => 'Display name for the new team member.',
-        'journal.team_role' => 'Journal admin has full manage access; editor handles editorial workflow; reviewer reviews assigned papers.',
+        'journal.team_role' => 'Journal admin has full manage access; editor handles editorial workflow; reviewer reviews assigned papers; production editor prepares accepted manuscripts for publication.',
         'journal.team_user' => 'Existing TJS user to add to this journal’s team.',
 
         // Editorial board
@@ -92,8 +92,10 @@ final class FormHelp
         'settings.default_license' => 'Fallback license for new journals and articles.',
         'settings.default_language' => 'ISO 639-1 language code (e.g. en) for platform defaults.',
         'settings.currency' => 'Default currency code for memberships and paid content.',
-        'settings.membership_platform_price' => 'Default platform-wide membership price in whole currency units.',
+        'settings.membership_platform_price' => 'Price charged for platform-wide membership when that product is active.',
         'settings.membership_platform_days' => 'How many days a platform membership purchase lasts.',
+        'settings.journal_activation_price' => 'Price charged to list a journal and unlock management when activation fees are active.',
+        'settings.journal_activation_days' => 'How long a paid journal activation lasts before renewal is required.',
         'settings.category_name' => 'Label shown on article category chips and filters.',
         'settings.category_active' => 'Inactive categories are hidden from article forms but kept for existing records.',
 
@@ -151,6 +153,7 @@ final class FormHelp
         'announcement.title' => 'Headline shown on the journal website and author submission picker.',
         'announcement.summary' => 'Short teaser for announcement listings.',
         'announcement.body' => 'Full announcement text shown on the public detail page.',
+        'announcement.guidelines' => 'Guidelines for authors — shown on the public call page and submission form. Include formatting rules, file requirements, and any submission or publication fees.',
         'announcement.issue' => 'Issue authors must submit to while this call is open.',
         'announcement.opens_at' => 'When authors can start submitting to this call.',
         'announcement.closes_at' => 'After this time the call closes and no new submissions are accepted.',

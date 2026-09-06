@@ -10,7 +10,7 @@
     <button
         type="button"
         class="tjs-field-helper__btn"
-        @click="open = !open"
+        @click.stop.prevent="open = !open"
         :aria-expanded="open"
         aria-label="What does this field mean?"
     >?</button>

@@ -2,6 +2,15 @@
 
 @section('title', 'About | '.$journal->title)
 @section('meta_description', Str::limit(strip_tags($journal->description ?: $journal->subtitle ?: $journal->title), 155))
+@section('canonical', route('journals.about', $journal))
+@section('seo')
+    @include('seo.page-meta', ['meta' => app(\App\Services\Seo\PageMeta::class)->journal(
+        $journal,
+        'About | '.$journal->title,
+        \Illuminate\Support\Str::limit(strip_tags($journal->description ?: $journal->subtitle ?: $journal->title), 155),
+        route('journals.about', $journal)
+    )])
+@endsection
 
 @section('content')
 @php
@@ -36,7 +45,7 @@
         <section class="jp-panel">
             <h2 class="jp-panel__title">About this journal</h2>
             @if(trim((string) $journal->description) !== '')
-                <div class="jp-prose">{{ $journal->description }}</div>
+                <div class="jp-prose tjs-prose">{!! \App\Support\SafeHtml::display($journal->description) !!}</div>
             @else
                 <p class="jp-lead" style="max-width:none">
                     A description for this journal has not been added yet. Check back soon for scope, audience, and submission guidance.

@@ -19,8 +19,8 @@ class Article extends Model
 
     protected $fillable = [
         'journal_id', 'issue_id', 'submission_id', 'author_user_id', 'slug', 'title',
-        'abstract', 'category', 'keywords', 'doi', 'license', 'page_range',
-        'visibility', 'price_amount', 'currency', 'document_path', 'status',
+        'abstract', 'category', 'keywords', 'doi', 'doi_deposit_status', 'doi_deposited_at', 'license', 'page_range',
+        'visibility', 'journal_fee_id', 'price_amount', 'currency', 'document_path', 'document_disk', 'status',
         'published_at', 'last_accessed_at', 'mins_read', 'references',
     ];
 
@@ -29,6 +29,7 @@ class Article extends Model
         return [
             'published_at' => 'datetime',
             'last_accessed_at' => 'datetime',
+            'doi_deposited_at' => 'datetime',
             'references' => 'array',
             'price_amount' => 'integer',
         ];
@@ -42,6 +43,11 @@ class Article extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class);
+    }
+
+    public function journalFee(): BelongsTo
+    {
+        return $this->belongsTo(JournalFee::class);
     }
 
     public function issue(): BelongsTo
@@ -91,7 +97,7 @@ class Article extends Model
             ->where('articles.status', 'published')
             ->whereNotNull('articles.published_at')
             ->where('articles.visibility', '!=', 'closed')
-            ->whereHas('journal', fn ($q) => $q->where('is_active', true))
+            ->whereHas('journal', fn ($q) => $q->listed())
             ->whereHas('issue', function ($q) {
                 $q->where('status', 'published')
                     ->whereHas('volume', fn ($v) => $v->where('status', 'published'));

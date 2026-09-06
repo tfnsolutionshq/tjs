@@ -1,8 +1,15 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
+import { registerTjsSelect } from './tjs-select';
+import { registerTjsRichText } from './tjs-richtext';
 
 window.Alpine = Alpine;
+
+document.addEventListener('alpine:init', () => {
+    registerTjsSelect(Alpine);
+    registerTjsRichText(Alpine);
+});
 
 Alpine.start();
 

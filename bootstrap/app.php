@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             'journal.manage' => \App\Http\Middleware\EnsureCanManageJournal::class,
             'review.queue' => \App\Http\Middleware\EnsureCanAccessReviewQueue::class,
+            'production.queue' => \App\Http\Middleware\EnsureCanAccessProductionQueue::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'paystack/webhook',

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin | '.config('tjs.name'))</title>
+    @include('seo.portal-head', [
+        'description' => config('tjs.full_name').' platform administration.',
+    ])
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800|libre-baskerville:400,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -113,6 +116,9 @@
             border-radius: 999px; background: var(--blue-strong);
             font-size: .65rem; font-weight: 800; color: #fff;
         }
+        .admin-nav__badge--featured {
+            background: var(--violet);
+        }
         .admin-nav a.is-active .admin-nav__badge { background: rgba(255,255,255,.22); }
 
         .admin-sidebar-select {
@@ -204,6 +210,39 @@
         .admin-topbar__public { display: none; }
         @media (min-width: 640px) {
             .admin-topbar__public { display: inline-flex; }
+        }
+        @media (max-width: 639px) {
+            .admin-topbar {
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: .55rem;
+                padding: .75rem .85rem;
+            }
+            .admin-topbar > .flex { min-width: 0; flex: 1 1 auto; }
+            .admin-topbar__title { font-size: 1.05rem; line-height: 1.2; }
+            .admin-topbar__sub {
+                font-size: .72rem;
+                white-space: normal;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            .admin-topbar__actions {
+                width: 100%;
+                max-width: 100%;
+                justify-content: stretch;
+                gap: .45rem;
+            }
+            .admin-topbar__actions .admin-chip,
+            .admin-topbar__actions .admin-btn {
+                flex: 1 1 auto;
+                justify-content: center;
+                min-width: 0;
+                padding: .52rem .65rem;
+                font-size: .74rem;
+            }
+            .admin-topbar__actions .admin-btn svg { width: .85rem; height: .85rem; }
         }
 
         .admin-chip, .admin-btn {
@@ -530,27 +569,14 @@
                 </a>
 
                 <p class="admin-nav__label">Catalog</p>
-                <a href="{{ route('admin.journals.index') }}" @class(['is-active' => request()->routeIs('admin.journals.*') || request()->routeIs('admin.volumes.*') || request()->routeIs('admin.issues.*') || request()->routeIs('admin.editorial-board.*')]) @click="sidebarOpen = false">
+                <a href="{{ ($adminFeaturedRequests ?? 0) > 0 ? route('admin.journals.index', ['status' => 'featured_requests']) : route('admin.journals.index') }}" @class(['is-active' => request()->routeIs('admin.journals.*') || request()->routeIs('admin.volumes.*') || request()->routeIs('admin.issues.*') || request()->routeIs('admin.editorial-board.*')]) @click="sidebarOpen = false">
                     {{-- open book --}}
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5v-13zM20 5.5c0-.83-.67-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5v-13z"/><path d="M12 4v16"/></svg>
                     Journals
+                    @if(($adminFeaturedRequests ?? 0) > 0)
+                        <span class="admin-nav__badge admin-nav__badge--featured" title="Featured requests awaiting approval">{{ $adminFeaturedRequests > 99 ? '99+' : $adminFeaturedRequests }}</span>
+                    @endif
                 </a>
-                @php($adminManaged = auth()->user()?->managedJournals() ?? collect())
-                @if($adminManaged->isNotEmpty())
-                    <div style="padding:.15rem .85rem .55rem">
-                        <label for="admin-jm-enter" style="display:block;margin:0 0 .35rem;font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.34)">Enter journal</label>
-                        <select
-                            id="admin-jm-enter"
-                            class="admin-sidebar-select"
-                            onchange="if(this.value) window.location.href=this.value"
-                        >
-                            <option value="">Select journal…</option>
-                            @foreach($adminManaged as $managed)
-                                <option value="{{ route('journal.manage.dashboard', $managed) }}">{{ $managed->title }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
                 <a href="{{ route('admin.articles.index') }}" @class(['is-active' => request()->routeIs('admin.articles.*')]) @click="sidebarOpen = false">
                     {{-- document --}}
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 3.5h7.5L19 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
@@ -575,10 +601,14 @@
                 <a href="{{ route('admin.membership-plans.index') }}" @class(['is-active' => request()->routeIs('admin.membership-plans.*')]) @click="sidebarOpen = false">
                     {{-- user --}}
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4.5 20.2a7.5 7.5 0 0115 0"/></svg>
-                    Membership plans
+                    Membership Plans
                 </a>
 
                 <p class="admin-nav__label">System</p>
+                <a href="{{ route('admin.doi.index') }}" @class(['is-active' => request()->routeIs('admin.doi.*')]) @click="sidebarOpen = false">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 7h10v10H7z"/><path d="M9.5 12h5M12 9.5v5"/></svg>
+                    DOI Credits
+                </a>
                 <a href="{{ route('admin.settings.index') }}" @class(['is-active' => request()->routeIs('admin.settings.*')]) @click="sidebarOpen = false">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/><path d="M19.4 13a7.8 7.8 0 000-2l2-1.2-2-3.4-2.3.6a7.7 7.7 0 00-1.7-1L15 3h-4l-.4 2.9a7.7 7.7 0 00-1.7 1L6.6 6.4l-2 3.4 2 1.2a7.8 7.8 0 000 2l-2 1.2 2 3.4 2.3-.6a7.7 7.7 0 001.7 1L11 21h4l.4-2.9a7.7 7.7 0 001.7-1l2.3.6 2-3.4-2-1.2z"/></svg>
                     Settings
@@ -588,7 +618,7 @@
                 <a href="{{ route('home') }}" @click="sidebarOpen = false">
                     {{-- external link --}}
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M14 5h5v5"/><path d="M10 14L19 5"/><path d="M19 13.5V18a1 1 0 01-1 1H6a1 1 0 01-1-1V6a1 1 0 011-1h4.5"/></svg>
-                    Public site
+                    Public Site
                 </a>
                 <a href="{{ route('profile.edit') }}" @click="sidebarOpen = false">
                     {{-- profile --}}
@@ -615,7 +645,7 @@
                     @csrf
                     <button type="submit" class="admin-logout">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H9"/></svg>
-                        Log out
+                        Log Out
                     </button>
                 </form>
             </div>
@@ -636,7 +666,7 @@
                 </div>
                 <div class="admin-topbar__actions">
                     <a href="{{ route('home') }}" class="admin-chip admin-topbar__public" target="_blank" rel="noopener">
-                        Public site
+                        Public Site
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18v4.5M18 6l-7 7M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4"/></svg>
                     </a>
                     @yield('page_actions')

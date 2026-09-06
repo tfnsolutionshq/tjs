@@ -69,7 +69,7 @@
 @once
 <style>
     .tjs-call-picker { position: relative; min-width: 0; z-index: 1; }
-    .tjs-call-picker:focus-within { z-index: 40; }
+    .tjs-call-picker:focus-within { z-index: 120; }
     .tjs-call-picker__trigger {
         width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .55rem;
         border: 1px solid #e2e8f0; background: #fff; border-radius: .7rem; padding: .68rem .8rem;
@@ -81,7 +81,7 @@
     .tjs-call-picker__chevron { width: 1rem; height: 1rem; color: #94a3b8; flex-shrink: 0; transition: transform .15s ease; }
     .tjs-call-picker__chevron.is-open { transform: rotate(180deg); }
     .tjs-call-picker__menu {
-        position: absolute; z-index: 50; left: 0; top: calc(100% + .35rem); width: max(100%, 20rem);
+        position: absolute; z-index: 130; left: 0; top: calc(100% + .35rem); width: max(100%, 20rem);
         background: #fff; border: 1px solid #e2e8f0; border-radius: .8rem;
         box-shadow: 0 16px 36px rgba(15,23,42,.12); overflow: hidden;
     }
