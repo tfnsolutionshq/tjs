@@ -37,7 +37,6 @@
     <div class="container-x py-12 sm:py-16">
         <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">Publications</p>
         <h1 class="tjs-serif mt-3 text-4xl font-bold text-slate-900">Journals</h1>
-        <p class="mt-3 max-w-2xl text-slate-500">Each journal has a branded website theme — colors, banner, logo, and typography.</p>
 
         @if($journals->total() > 0)
             @include('public.journals.partials.list-controls', ['paginator' => $journals, 'layout' => $layout])
