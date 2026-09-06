@@ -32,5 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="PAYSTACK_SECRET_KEY" value="sk_test_ci_dummy"/>
+        <env name="PAYSTACK_PUBLIC_KEY" value="pk_test_ci_dummy"/>
     </php>
 </phpunit>
