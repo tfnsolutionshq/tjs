@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Setting;
 use App\Support\Licenses;
 use App\Support\PlatformSettings;
+use App\Support\SiteNotice;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,13 +23,15 @@ class SettingsAdminController extends Controller
         }
 
         $settings = PlatformSettings::current();
+        $siteNotice = SiteNotice::adminFormState();
+        $siteNoticeHint = SiteNotice::adminHint($siteNotice['set_at']);
         $categories = Category::query()
             ->withCount('articles')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
-        return view('admin.settings.index', compact('tab', 'settings', 'categories'));
+        return view('admin.settings.index', compact('tab', 'settings', 'categories', 'siteNotice', 'siteNoticeHint'));
     }
 
     public function updateGeneral(Request $request): RedirectResponse
@@ -54,6 +57,9 @@ class SettingsAdminController extends Controller
             'doi_threshold_absolute' => ['required', 'integer', 'min:0', 'max:100000'],
             'doi_threshold_percent' => ['required', 'integer', 'min:0', 'max:100'],
             'doi_platform_prefix' => ['required', 'string', 'max:120'],
+            'site_notice_enabled' => ['sometimes', 'boolean'],
+            'site_notice_message' => ['nullable', 'string', 'max:500'],
+            'site_notice_style' => ['nullable', 'string', Rule::in(['info', 'warning', 'success'])],
         ]);
 
         $data['membership_platform_enabled'] = $request->boolean('membership_platform_enabled');
@@ -67,7 +73,13 @@ class SettingsAdminController extends Controller
         $data['doi_threshold_percent'] = max(0, min(100, (int) $data['doi_threshold_percent']));
         $data['doi_platform_prefix'] = rtrim((string) $data['doi_platform_prefix'], '/');
 
+        $noticeEnabled = $request->boolean('site_notice_enabled');
+        $noticeMessage = (string) $request->input('site_notice_message', '');
+        $noticeStyle = (string) $request->input('site_notice_style', 'info');
+        unset($data['site_notice_enabled'], $data['site_notice_message'], $data['site_notice_style']);
+
         Setting::putMany($data);
+        SiteNotice::save($noticeEnabled, $noticeMessage, $noticeStyle);
         PlatformSettings::applyToConfig();
 
         return redirect()

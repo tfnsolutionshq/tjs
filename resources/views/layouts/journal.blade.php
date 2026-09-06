@@ -243,6 +243,7 @@
     </style>
 </head>
 <body class="journal-site antialiased" x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
+    <x-site-notice />
     @php
         $nav = [
             ['label' => 'Current', 'route' => 'journals.show', 'params' => [$journal]],
@@ -366,15 +367,12 @@
     </main>
 
     <footer class="j-footer mt-16">
-        <div class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 sm:px-6">
             <p>{{ $journal->title }} · {{ $journal->publisher ?: config('tjs.organization') }}</p>
-            <p>
-                @if($journal->issn)ISSN {{ $journal->issn }} · @endif
-                <a class="j-link" href="{{ route('home') }}">{{ config('tjs.name') }}</a>
-                <span aria-hidden="true"> · </span>
-                Developed by
-                <a class="j-link" href="{{ config('tjs.developer_url') }}" target="_blank" rel="noopener noreferrer">{{ config('tjs.developer_name') }}</a>
-            </p>
+            @if($journal->issn)<p class="text-sm opacity-80">ISSN {{ $journal->issn }}</p>@endif
+            <div class="text-sm opacity-90">
+                <x-platform-footer />
+            </div>
         </div>
     </footer>
 </body>

@@ -186,6 +186,7 @@
     </style>
 </head>
 <body class="tjs-body" x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
+    <x-site-notice />
     <header class="site-nav" @click.outside="navOpen = false">
         <div class="container-x">
             <div class="site-nav__bar">
@@ -298,17 +299,8 @@
             </div>
         </div>
         <div class="border-t border-white/10">
-            <div class="container-x flex flex-col gap-2 py-4 text-xs sm:flex-row sm:justify-between">
-                <p>&copy; {{ date('Y') }} {{ config('tjs.organization') }}</p>
-                <p>
-                    Developed by
-                    <a
-                        href="{{ config('tjs.developer_url') }}"
-                        class="text-white hover:underline font-semibold"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >{{ config('tjs.developer_name') }}</a>
-                </p>
+            <div class="container-x py-4 text-xs text-white/80 [&_.platform-footer-bar_a]:text-white [&_.platform-footer-bar_a:hover]:underline">
+                <x-platform-footer />
             </div>
         </div>
     </footer>

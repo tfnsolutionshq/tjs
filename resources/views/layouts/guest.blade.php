@@ -365,6 +365,7 @@
     @endif
 </head>
 <body>
+    <x-site-notice />
     <x-flash />
     <div class="auth-shell">
         <aside class="auth-brand">

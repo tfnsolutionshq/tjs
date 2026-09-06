@@ -184,6 +184,8 @@
         $currentFlagUrl = $currentCurrency ? 'https://flagcdn.com/'.$currentCurrency['flag'].'.svg' : '';
         $membershipEnabled = (string) old('membership_platform_enabled', $settings['membership_platform_enabled'] ? '1' : '0') === '1';
         $activationEnabled = (string) old('journal_activation_enabled', $settings['journal_activation_enabled'] ? '1' : '0') === '1';
+        $noticeEnabled = (string) old('site_notice_enabled', ($siteNotice['enabled'] ?? false) ? '1' : '0') === '1';
+        $noticeStyle = old('site_notice_style', $siteNotice['style'] ?? 'info');
     @endphp
 
     <form
@@ -192,6 +194,7 @@
         x-data="{
             membershipOn: @js($membershipEnabled),
             activationOn: @js($activationEnabled),
+            noticeOn: @js($noticeEnabled),
         }"
     >
         @csrf
@@ -366,6 +369,51 @@
                             <label for="doi_platform_prefix" style="display:block;margin-bottom:.4rem;font-size:.78rem;font-weight:700;color:#334155">Platform DOI prefix</label>
                             <input id="doi_platform_prefix" name="doi_platform_prefix" type="text" required class="as-input" value="{{ old('doi_platform_prefix', $settings['doi_platform_prefix'] ?? '10.0000/tjs') }}" placeholder="10.xxxx/tjs">
                         </div>
+                    </div>
+                </div>
+
+                <div class="as-card" style="margin-top:.85rem" :class="!noticeOn && 'opacity-90'">
+                    <div class="as-card__head">
+                        <h2 class="as-card__title">Site-wide notice bar</h2>
+                        <p class="as-card__desc">Banner at the very top of the public site and member portal. Automatically clears one week after you save a new message.</p>
+                    </div>
+                    <div class="as-card__body">
+                        <div class="as-pay-card__top" style="margin-bottom:.85rem">
+                            <div>
+                                <span class="as-pay-status" :class="noticeOn ? 'is-on' : 'is-off'" x-text="noticeOn ? 'Visible' : 'Hidden'"></span>
+                            </div>
+                            <label class="as-switch" title="Show site-wide notice">
+                                <input type="hidden" name="site_notice_enabled" :value="noticeOn ? '1' : '0'">
+                                <input type="checkbox" x-model="noticeOn" aria-label="Site notice active">
+                                <span class="as-switch__track"><span class="as-switch__thumb"></span></span>
+                            </label>
+                        </div>
+                        <div class="as-grid as-grid--2">
+                            <div class="as-field" style="grid-column:1/-1">
+                                <x-form-label for="site_notice_message" field="settings.site_notice_message">Message</x-form-label>
+                                <textarea
+                                    id="site_notice_message"
+                                    name="site_notice_message"
+                                    rows="3"
+                                    maxlength="500"
+                                    class="as-input"
+                                    placeholder="e.g. Testing environment — records will be wiped after one week."
+                                    x-bind:disabled="!noticeOn"
+                                >{{ old('site_notice_message', $siteNotice['message'] ?? '') }}</textarea>
+                                @error('site_notice_message')<p class="as-error">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="as-field">
+                                <x-form-label for="site_notice_style" field="settings.site_notice_style">Style</x-form-label>
+                                <select id="site_notice_style" name="site_notice_style" class="as-input" x-bind:disabled="!noticeOn">
+                                    <option value="info" @selected($noticeStyle === 'info')>Info (blue)</option>
+                                    <option value="warning" @selected($noticeStyle === 'warning')>Warning (amber)</option>
+                                    <option value="success" @selected($noticeStyle === 'success')>Success (green)</option>
+                                </select>
+                            </div>
+                        </div>
+                        @if($siteNoticeHint ?? null)
+                            <p style="margin:.75rem 0 0;font-size:.78rem;color:var(--muted)">{{ $siteNoticeHint }}</p>
+                        @endif
                     </div>
                 </div>
 

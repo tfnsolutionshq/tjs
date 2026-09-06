@@ -619,6 +619,7 @@
     </style>
 </head>
 <body class="admin-body" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false">
+<x-site-notice />
 @php
     $mpUser = auth()->user();
     $showReviews = $mpUser && $mpUser->canAccessReviewQueue();
