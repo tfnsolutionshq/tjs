@@ -12,6 +12,8 @@
 @endsection
 
 @section('content')
+@include('public.partials.pagination-styles')
+
 {{-- Hero — editorial illustration background --}}
 <section class="relative overflow-hidden" style="background:#f7f8fa">
     <div
@@ -92,7 +94,7 @@
 </section>
 
 {{-- Journals --}}
-<section class="container-x py-14">
+<section id="journals" class="container-x py-14">
     <div class="tjs-reveal mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
             <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">Publications</p>
@@ -147,44 +149,37 @@
             <p class="text-sm text-slate-500">No journals published yet.</p>
         @endforelse
     </div>
+
+    @if($journals->hasPages())
+        {{ $journals->links('vendor.pagination.journal') }}
+    @endif
 </section>
 
 {{-- Latest articles --}}
 <section id="latest" class="border-t border-slate-100 bg-[#f7f8fa]">
     <div class="container-x py-14">
-        <div class="tjs-reveal mb-8">
-            <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">Reading</p>
-            <h2 class="tjs-serif mt-2 text-3xl font-bold text-slate-900">Latest articles</h2>
+        <div class="tjs-reveal mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">Reading</p>
+                <h2 class="tjs-serif mt-2 text-3xl font-bold text-slate-900">Latest articles</h2>
+            </div>
+            <a href="{{ route('articles.index') }}" class="btn btn-outline !py-2 !px-3 text-sm">View all</a>
         </div>
 
         <div class="grid gap-5 lg:grid-cols-2">
             @forelse($latest as $article)
-                @php $jt = $article->journal->themeConfig(); @endphp
-                <article class="card tjs-reveal flex flex-col sm:flex-row" style="--reveal-delay: {{ 50 + ($loop->index * 70) }}ms">
-                    <div class="card-media h-36 w-full shrink-0 sm:h-auto sm:w-40" style="background: linear-gradient(160deg, {{ $jt['primary'] }}, {{ $jt['accent'] }})"></div>
-                    <div class="flex flex-1 flex-col p-5">
-                        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                            <a href="{{ route('journals.show', $article->journal) }}" class="font-semibold transition-opacity hover:opacity-70" style="color:var(--blue)">{{ $article->journal->title }}</a>
-                            @if($article->issue)<span>{{ $article->issue->label() }}</span>@endif
-                            <span class="badge">{{ str_replace('_', ' ', $article->visibility) }}</span>
-                        </div>
-                        <h3 class="tjs-serif mt-2 text-xl font-bold leading-snug">
-                            <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" class="transition-opacity hover:opacity-75">{{ $article->title }}</a>
-                        </h3>
-                        <p class="mt-2 text-sm text-slate-500">
-                            {{ $article->authors->pluck('name')->join(', ') ?: 'Author TBA' }}
-                            @if($article->published_at) · {{ $article->published_at->format('M j, Y') }} @endif
-                        </p>
-                        @if($article->abstract)
-                            <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-500">{{ Str::limit(strip_tags($article->abstract), 140) }}</p>
-                        @endif
-                        <a href="{{ route('journals.articles.show', [$article->journal, $article]) }}" class="tjs-link-arrow mt-4 text-sm font-semibold" style="color:var(--blue)">Read article <span aria-hidden="true">→</span></a>
-                    </div>
-                </article>
+                @include('public.partials.article-card', [
+                    'article' => $article,
+                    'revealDelay' => 50 + ($loop->index * 70),
+                ])
             @empty
                 <p class="text-sm text-slate-500">No public articles yet.</p>
             @endforelse
         </div>
+
+        @if($latest->hasPages())
+            {{ $latest->links('vendor.pagination.journal') }}
+        @endif
     </div>
 </section>
 

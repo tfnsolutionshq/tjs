@@ -20,6 +20,7 @@ class JournalInitialsTest extends TestCase
                 'title' => 'African Journal of Digital Infrastructure',
                 'slug' => 'ajdi',
                 'initials' => 'AJDI',
+                'review_type' => 'closed',
                 'is_active' => '1',
             ])
             ->assertRedirect();
@@ -46,6 +47,7 @@ class JournalInitialsTest extends TestCase
                 'title' => 'Second Journal',
                 'slug' => 'second-journal',
                 'initials' => 'TJS',
+                'review_type' => 'closed',
                 'is_active' => '1',
             ])
             ->assertRedirect();

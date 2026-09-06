@@ -90,7 +90,7 @@ class JournalBillingTest extends TestCase
         $response = $this->actingAs($admin)
             ->get(route('journal.manage.billing.index', $journal))
             ->assertOk()
-            ->assertSee('Payments &amp; income', false)
+            ->assertSee('Payments &amp; Income', false)
             ->assertSee('ACT-REF-001', false)
             ->assertSee('ART-REF-001', false)
             ->assertSee('MEM-REF-001', false)
@@ -144,7 +144,7 @@ class JournalBillingTest extends TestCase
         $this->actingAs($user)
             ->get(route('journal.manage.billing.index', $journal))
             ->assertOk()
-            ->assertSee('Payments &amp; income', false);
+            ->assertSee('Payments &amp; Income', false);
 
         $this->actingAs($user)
             ->get(route('journal.manage.billing.export', $journal))

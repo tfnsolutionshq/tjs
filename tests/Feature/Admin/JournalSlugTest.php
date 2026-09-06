@@ -77,6 +77,7 @@ class JournalSlugTest extends TestCase
             ->post(route('admin.journals.store'), [
                 'title' => 'Duplicate Slug Journal',
                 'slug' => 'tfn-open-research',
+                'review_type' => 'closed',
                 'is_active' => '1',
             ])
             ->assertRedirect(route('admin.journals.create'))
@@ -98,6 +99,7 @@ class JournalSlugTest extends TestCase
             ->put(route('admin.journals.update', $journal), [
                 'title' => 'Updated Title',
                 'slug' => 'new-slug',
+                'review_type' => 'closed',
                 'is_active' => '1',
             ])
             ->assertRedirect(route('admin.journals.edit', $journal));

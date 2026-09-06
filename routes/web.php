@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\SettingsAdminController;
 use App\Http\Controllers\Admin\SubmissionAdminController;
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\Admin\VolumeAdminController;
+use App\Http\Controllers\ArticleCatalogController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Author\SubmissionController as AuthorSubmissionController;
 use App\Http\Controllers\CatalogCoverController;
@@ -50,6 +51,7 @@ Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap')
 Route::get('/sitemap-site.xml', [SitemapController::class, 'site'])->name('sitemap.site');
 Route::get('/j/{journal}/sitemap.xml', [SitemapController::class, 'journal'])->name('sitemap.journal');
 
+Route::get('/articles', ArticleCatalogController::class)->name('articles.index');
 Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
 Route::get('/j/{journal}', [JournalController::class, 'show'])->name('journals.show');
 

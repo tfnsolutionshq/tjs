@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\Journal;
 use App\Models\User;
+use App\Support\JournalActivation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,6 +18,9 @@ class AuthenticationTest extends TestCase
             'slug' => 'demo-journal',
             'title' => 'Demo Journal',
             'is_active' => true,
+            'is_featured' => true,
+            'activation_status' => JournalActivation::STATUS_ACTIVE,
+            'activation_expires_at' => now()->addYear(),
         ], $overrides));
     }
 
