@@ -631,7 +631,7 @@
 
         <aside class="admin-sidebar" :class="{ 'is-open': sidebarOpen }">
             <a href="{{ route('dashboard') }}" class="admin-brand" @click="sidebarOpen = false">
-                <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}">
+                <x-platform-logo variant="dark" type="icon" class="h-9 w-auto object-contain" />
                 <span class="admin-brand__text">{{ config('tjs.name') }} <span>PORTAL</span></span>
             </a>
 

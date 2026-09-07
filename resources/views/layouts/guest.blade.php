@@ -376,7 +376,7 @@
                     </a>
                 @else
                     <a href="{{ route('home') }}" class="inline-flex items-center text-white no-underline relative z-10">
-                        <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}" class="h-10 w-auto rounded-md bg-white object-contain p-0.5">
+                        <x-platform-logo variant="dark" class="h-10 w-auto object-contain" />
                     </a>
                 @endif
             </div>
@@ -416,7 +416,7 @@
                         </a>
                     @else
                         <a href="{{ route('home') }}" class="inline-flex items-center text-[var(--ink)] no-underline">
-                            <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}" class="h-9 w-auto rounded-md object-contain">
+                            <x-platform-logo variant="light" class="h-9 w-auto object-contain" />
                         </a>
                     @endif
                 </div>

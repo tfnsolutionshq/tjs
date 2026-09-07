@@ -342,7 +342,7 @@ class PaymentReceiptService
 
     private function platformLogoPath(): ?string
     {
-        $relative = ltrim((string) config('tjs.brand_icon', 'images/tfns-logo.jpeg'), '/');
+        $relative = ltrim((string) config('tjs.brand.icon_light_png', config('tjs.brand_icon')), '/');
         $path = public_path($relative);
 
         return is_file($path) ? $path : null;

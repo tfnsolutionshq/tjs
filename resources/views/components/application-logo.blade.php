@@ -1,10 +1,13 @@
 @props([
     'class' => 'h-8 w-auto object-contain',
-    'alt' => config('tjs.organization').' logo',
+    'alt' => config('tjs.full_name'),
+    'variant' => 'dark',
+    'type' => 'full',
 ])
 
-<img
-    src="{{ asset('images/tfns-logo.jpeg') }}"
-    alt="{{ $alt }}"
+<x-platform-logo
+    :variant="$variant"
+    :type="$type"
+    :alt="$alt"
     {{ $attributes->merge(['class' => $class]) }}
->
+/>

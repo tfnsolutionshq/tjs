@@ -11,7 +11,16 @@ return [
         'email' => env('TJS_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS', 'support@tfnsolutions.us')),
         'phone' => env('TJS_SUPPORT_PHONE'),
     ],
-    'brand_icon' => env('TJS_BRAND_ICON', 'images/tfns-logo.jpeg'),
+    'brand_icon' => env('TJS_BRAND_ICON', 'images/brand/tjs-icon-light.png'),
+    'brand' => [
+        'logo_light' => 'images/brand/tjs-logo-light.png',
+        'logo_dark' => 'images/brand/tjs-logo-dark.png',
+        'icon_light' => 'images/brand/tjs-icon-light.svg',
+        'icon_dark' => 'images/brand/tjs-icon-dark.svg',
+        'icon_light_png' => 'images/brand/tjs-icon-light.png',
+        'icon_dark_png' => 'images/brand/tjs-icon-dark.png',
+        'logo_master' => 'images/brand/tjs-logo.jpg',
+    ],
     /*
     | Marketing copy (lead-approved).
     | - tagline: short product line
@@ -19,7 +28,7 @@ return [
     | - description: major product description (README / about)
     */
     'tagline' => 'TurboFlux Journal System (TJS): a modern publishing solution for anyone who publishes—built to simplify, professionalize, and scale the entire article publishing process.',
-    'pitch' => 'TJS gives Turbo Flux Network Solutions multi-journal websites, peer review, APA citations, and access-controlled full text — with branding themes for every journal.',
+    'pitch' => 'TurboFlux Journal System (TJS): a modern publishing solution for anyone who publishes—built to simplify, professionalize, and scale the entire article publishing process.',
     'description' => 'TurboFlux Journal System (TJS) is a modern, all-in-one publishing platform designed for individual researchers, scholars, academics, authors, research groups, universities, academic departments, professional associations, learned societies, publishers, institutions, corporations, government agencies, NGOs, and other organisations that publish scholarly, scientific, technical, professional, or general-interest articles.
 
 TJS streamlines the entire journal publishing lifecycle in one powerful platform—from article submission and editorial management to peer review, citation formatting, publication, DOI deposition, access-controlled full text, and long-term journal management. It supports multiple journals from a single platform, with customizable branding themes.',

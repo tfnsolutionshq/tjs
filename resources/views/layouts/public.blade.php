@@ -203,7 +203,7 @@
                 </button>
 
                 <a href="{{ route('home') }}" class="flex min-w-0 flex-1 items-center !text-white md:flex-none">
-                    <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}" class="h-9 w-auto rounded-md bg-white object-contain p-0.5">
+                    <x-platform-logo variant="dark" class="h-9 w-auto object-contain" />
                 </a>
 
                 <nav class="hidden items-center gap-6 md:flex">
@@ -283,7 +283,7 @@
         <div class="container-x grid gap-8 py-12 sm:grid-cols-3">
             <div>
                 <a href="{{ route('home') }}" class="inline-flex">
-                    <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}" class="h-10 w-auto rounded-md bg-white object-contain p-0.5">
+                    <x-platform-logo variant="dark" class="h-10 w-auto object-contain" />
                 </a>
                 <p class="mt-3 text-sm leading-relaxed">{{ config('tjs.full_name') }} by {{ config('tjs.organization') }}.</p>
             </div>

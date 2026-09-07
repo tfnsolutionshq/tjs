@@ -15,7 +15,7 @@ class PageMeta
      */
     public function site(string $title, ?string $description, string $url, ?string $image = null): array
     {
-        $image ??= asset('images/tfns-logo.jpeg');
+        $image ??= asset(config('tjs.brand.logo_master', config('tjs.brand_icon')));
         $description = filled($description)
             ? (string) $description
             : (string) (config('tjs.pitch')

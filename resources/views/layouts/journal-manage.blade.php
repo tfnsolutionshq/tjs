@@ -553,7 +553,7 @@
                 @if($jmJournal?->logoUrl())
                     <img src="{{ $jmJournal->logoUrl() }}" alt="{{ $jmJournal->title }}">
                 @else
-                    <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="{{ config('tjs.organization') }}">
+                    <x-platform-logo variant="dark" type="icon" class="h-9 w-auto object-contain" />
                 @endif
                 <span class="admin-brand__text">Journal <span>MANAGE</span></span>
             </a>

@@ -286,7 +286,7 @@
 
             <div class="j-nav__actions">
                 <a href="{{ route('home') }}" class="j-nav__icon-btn" title="{{ config('tjs.name') }}" aria-label="{{ config('tjs.name') }} home">
-                    <img src="{{ asset('images/tfns-logo.jpeg') }}" alt="" style="width:1.35rem;height:1.35rem;object-fit:contain;border-radius:.25rem;background:#fff">
+                    <img src="{{ \App\Support\PlatformBrand::logo(onDarkBackground: true, iconOnly: true) }}" alt="" style="width:1.35rem;height:1.35rem;object-fit:contain">
                 </a>
                 @auth
                     <a href="{{ route('dashboard') }}" class="j-nav__account">Dashboard</a>
