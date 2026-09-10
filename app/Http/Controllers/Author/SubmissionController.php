@@ -4,30 +4,24 @@ namespace App\Http\Controllers\Author;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
-use App\Models\ReviewerAssignment;
 use App\Models\Submission;
-use App\Models\SubmissionRevision;
-use App\Models\SubmissionTimeline;
+use App\Services\Author\AuthorSubmissionService;
 use App\Services\Journal\CallForSubmissionService;
 use App\Services\Journal\JournalFeeResolver;
 use App\Services\Payments\PaymentFulfillmentService;
-use App\Services\Storage\ArticleStorage;
-use App\Support\ReviewType;
 use App\Support\SafeHtml;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SubmissionController extends Controller
 {
     public function __construct(
-        private ArticleStorage $storage,
         private CallForSubmissionService $calls,
         private JournalFeeResolver $fees,
         private PaymentFulfillmentService $payments,
+        private AuthorSubmissionService $authorSubmissions,
     ) {
     }
 
@@ -153,53 +147,11 @@ class SubmissionController extends Controller
             'document' => ['required', 'file', 'mimes:doc,docx', 'max:51200'],
         ]);
 
-        $fee = $this->fees->requiredSubmissionFeeForJournal((int) $journal->id);
-
-        $submission = DB::transaction(function () use ($request, $data, $announcement, $journal, $fee) {
-            $status = 'submitted';
-            if ($fee && (int) $fee->amount > 0) {
-                $status = 'fee_pending';
-            }
-
-            $submission = new Submission([
-                'journal_id' => $journal->id,
-                'issue_id' => $announcement->issue_id,
-                'announcement_id' => $announcement->id,
-                'journal_fee_id' => $fee?->id,
-                'author_id' => $request->user()->id,
-                'title' => $data['title'],
-                'abstract' => SafeHtml::clean($data['abstract'] ?? null),
-                'category' => $data['category'] ?? null,
-                'keywords' => $data['keywords'] ?? null,
-                'status' => $status,
-                'review_type' => ReviewType::forJournal($journal),
-            ]);
-            $submission->id = (string) Str::uuid();
-
-            [$path, $disk] = $this->storage->storeSubmissionDocument(
-                $journal,
-                $submission->id,
-                $request->file('document')
-            );
-            $submission->document_path = $path;
-            $submission->document_disk = $disk;
-            $submission->save();
-
-            if ($status === 'submitted') {
-                SubmissionTimeline::query()->create([
-                    'submission_id' => $submission->id,
-                    'user_id' => $request->user()->id,
-                    'event' => 'submitted',
-                    'metadata' => [
-                        'announcement_id' => $announcement->id,
-                        'issue_id' => $announcement->issue_id,
-                        'journal_fee_id' => $fee?->id,
-                    ],
-                ]);
-            }
-
-            return $submission;
-        });
+        $submission = $this->authorSubmissions->create(
+            $request->user(),
+            $data,
+            $request->file('document')
+        );
 
         if ($submission->status === 'fee_pending') {
             try {
@@ -244,103 +196,15 @@ class SubmissionController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $submission->loadMissing('journal');
-
-        DB::transaction(function () use ($request, $submission, $data) {
-            $previousPath = $submission->document_path;
-            $previousDisk = $submission->document_disk;
-
-            [$path, $disk] = $this->storage->storeSubmissionDocument(
-                $submission->journal,
-                $submission->id,
-                $request->file('document')
-            );
-
-            $revisionNumber = (int) $submission->revisions()->max('revision_number');
-
-            // Preserve the pre-resubmission manuscript as revision history when missing.
-            if (
-                $previousPath
-                && ! $submission->revisions()->where('document_path', $previousPath)->exists()
-            ) {
-                if ($revisionNumber < 1) {
-                    SubmissionRevision::query()->create([
-                        'submission_id' => $submission->id,
-                        'uploaded_by' => $submission->author_id,
-                        'revision_number' => 0,
-                        'document_path' => $previousPath,
-                        'document_disk' => $previousDisk,
-                        'notes' => 'Original submission',
-                    ]);
-                    $revisionNumber = 0;
-                }
-            }
-
-            $revisionNumber++;
-
-            SubmissionRevision::query()->create([
-                'submission_id' => $submission->id,
-                'uploaded_by' => $request->user()->id,
-                'revision_number' => $revisionNumber,
-                'document_path' => $path,
-                'document_disk' => $disk,
-                'notes' => $data['notes'] ?? null,
-            ]);
-
-            $reviewerId = $submission->reviewer_id;
-            if (! $reviewerId) {
-                $reviewerId = ReviewerAssignment::query()
-                    ->where('submission_id', $submission->id)
-                    ->orderByDesc('id')
-                    ->value('reviewer_id');
-            }
-
-            $submission->update([
-                'document_path' => $path,
-                'document_disk' => $disk,
-                'status' => 'resubmitted',
-                'reviewer_id' => $reviewerId,
-            ]);
-
-            if ($reviewerId) {
-                $this->reopenReviewerAssignment($submission, (int) $reviewerId);
-            }
-
-            SubmissionTimeline::query()->create([
-                'submission_id' => $submission->id,
-                'user_id' => $request->user()->id,
-                'event' => 'resubmitted',
-                'metadata' => [
-                    'revision_number' => $revisionNumber,
-                    'reviewer_id' => $reviewerId ? (int) $reviewerId : null,
-                ],
-            ]);
-        });
+        $this->authorSubmissions->resubmit(
+            $request->user(),
+            $submission,
+            $request->file('document'),
+            $data['notes'] ?? null,
+        );
 
         return redirect()
             ->route('author.submissions.show', $submission)
             ->with('status', 'Revision uploaded. It has been returned to the assigned reviewer.');
-    }
-
-    private function reopenReviewerAssignment(Submission $submission, int $reviewerId): void
-    {
-        $assignment = ReviewerAssignment::query()
-            ->where('submission_id', $submission->id)
-            ->where('reviewer_id', $reviewerId)
-            ->orderByDesc('id')
-            ->first();
-
-        if ($assignment) {
-            $assignment->update(['status' => 'assigned']);
-
-            return;
-        }
-
-        ReviewerAssignment::query()->create([
-            'submission_id' => $submission->id,
-            'reviewer_id' => $reviewerId,
-            'status' => 'assigned',
-            'priority' => 3,
-        ]);
     }
 }

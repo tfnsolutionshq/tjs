@@ -1,16 +1,17 @@
 <?php
 
-namespace App\Http\Controllers\Production;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\V1\ProductionDetailResource;
+use App\Http\Resources\Api\V1\ProductionQueueResource;
 use App\Models\Submission;
 use App\Services\Journal\SubmissionProductionService;
 use App\Services\Storage\HybridDisk;
-use App\Support\ProductionChecklist;
+use App\Support\JournalTeamRoles;
 use App\Support\SubmissionStatus;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductionController extends Controller
@@ -21,7 +22,7 @@ class ProductionController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): JsonResponse
     {
         $journalId = $request->integer('journal_id') ?: null;
         $user = $request->user();
@@ -31,7 +32,6 @@ class ProductionController extends Controller
             : $user->productionJournals()->pluck('id')->all();
 
         $base = Submission::query()
-            ->with(['journal:id,title,slug', 'author:id,name,email', 'issue.volume', 'productionAssignee:id,name'])
             ->when($journalIds !== null, fn ($q) => $q->whereIn('journal_id', $journalIds))
             ->when($journalId, fn ($q) => $q->where('journal_id', $journalId));
 
@@ -43,24 +43,31 @@ class ProductionController extends Controller
         ];
 
         $filter = $request->get('filter', 'awaiting');
-        $query = clone $base;
+        $query = (clone $base)
+            ->with(['journal:id,title,slug', 'author:id,name', 'issue.volume', 'productionAssignee:id,name']);
+
         if ($filter === 'in_production') {
             $query->where('status', SubmissionStatus::IN_PRODUCTION);
         } elseif ($filter === 'ready') {
             $query->where('status', SubmissionStatus::READY_TO_PUBLISH);
         } elseif ($filter === 'completed') {
-            $query->where('status', SubmissionStatus::PUBLISHED)->orderByDesc('updated_at')->limit(20);
+            $query->where('status', SubmissionStatus::PUBLISHED);
         } else {
             $query->where('status', SubmissionStatus::READY_FOR_PRODUCTION);
         }
 
-        $submissions = $query->orderByDesc('reviewed_at')->orderByDesc('updated_at')->paginate(15)->withQueryString();
-        $journals = $user->productionJournals();
+        $submissions = $query
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('updated_at')
+            ->paginate($request->integer('per_page', 15))
+            ->withQueryString();
 
-        return view('production.queue.index', compact('submissions', 'stats', 'filter', 'journals', 'journalId'));
+        return ProductionQueueResource::collection($submissions)
+            ->additional(['meta' => ['stats' => $stats, 'filter' => $filter]])
+            ->response();
     }
 
-    public function show(Request $request, Submission $submission): View
+    public function show(Request $request, Submission $submission): JsonResponse
     {
         $this->assertAccessible($request, $submission);
 
@@ -76,28 +83,32 @@ class ProductionController extends Controller
             'publicationJournalFee',
         ]);
 
-        $checklist = ProductionChecklist::normalize($submission->production_checklist);
-        $currentFile = $submission->currentProductionFile();
-
-        return view('production.queue.show', compact('submission', 'checklist', 'currentFile'));
+        return response()->json([
+            'data' => new ProductionDetailResource($submission),
+        ]);
     }
 
-    public function start(Request $request, Submission $submission): RedirectResponse
+    public function start(Request $request, Submission $submission): JsonResponse
     {
         $this->assertAccessible($request, $submission);
 
         try {
-            $this->production->startProduction($submission, $request->user());
+            $submission = $this->production->startProduction($submission, $request->user());
         } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return redirect()
-            ->route('production.queue.show', $submission)
-            ->with('status', 'Production started.');
+        $submission->load(['journal', 'author', 'issue.volume', 'productionFiles.uploader', 'productionAssignee', 'timelines.user']);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Production started.',
+                'submission' => new ProductionDetailResource($submission),
+            ],
+        ]);
     }
 
-    public function upload(Request $request, Submission $submission): RedirectResponse
+    public function upload(Request $request, Submission $submission): JsonResponse
     {
         $this->assertAccessible($request, $submission);
 
@@ -109,18 +120,23 @@ class ProductionController extends Controller
             $this->production->uploadProductionDocument(
                 $submission,
                 $request->user(),
-                $data['production_document']
+                $data['production_document'],
             );
         } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return redirect()
-            ->route('production.queue.show', $submission)
-            ->with('status', 'Production document uploaded.');
+        $submission->load(['journal', 'author', 'issue.volume', 'productionFiles.uploader', 'productionAssignee', 'timelines.user']);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Production document uploaded.',
+                'submission' => new ProductionDetailResource($submission),
+            ],
+        ]);
     }
 
-    public function complete(Request $request, Submission $submission): RedirectResponse
+    public function complete(Request $request, Submission $submission): JsonResponse
     {
         $this->assertAccessible($request, $submission);
 
@@ -130,14 +146,19 @@ class ProductionController extends Controller
         }
 
         try {
-            $this->production->completeProduction($submission, $request->user(), $checklistInput);
+            $submission = $this->production->completeProduction($submission, $request->user(), $checklistInput);
         } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return redirect()
-            ->route('production.queue.show', $submission)
-            ->with('status', 'Production marked complete. Editors can now publish this manuscript.');
+        $submission->load(['journal', 'author', 'issue.volume', 'productionFiles.uploader', 'productionAssignee', 'timelines.user']);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Production marked complete. Editors can now publish this manuscript.',
+                'submission' => new ProductionDetailResource($submission),
+            ],
+        ]);
     }
 
     public function downloadSource(Request $request, Submission $submission): StreamedResponse
@@ -186,7 +207,7 @@ class ProductionController extends Controller
 
         $allowed = $user->journals()
             ->where('journals.id', $submission->journal_id)
-            ->wherePivot('role', \App\Support\JournalTeamRoles::PRODUCTION_EDITOR)
+            ->wherePivot('role', JournalTeamRoles::PRODUCTION_EDITOR)
             ->exists();
 
         abort_unless($allowed, 403);

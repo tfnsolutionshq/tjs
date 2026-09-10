@@ -6,14 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ReviewerAssignment;
 use App\Models\Submission;
 use App\Models\SubmissionRevision;
-use App\Models\SubmissionTimeline;
-use App\Services\Journal\SubmissionAcceptanceService;
+use App\Services\Reviewer\ReviewerDecisionService;
 use App\Support\ReviewType;
 use App\Support\SubmissionStatus;
 use App\Services\Storage\HybridDisk;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -21,7 +19,7 @@ class ReviewController extends Controller
 {
     public function __construct(
         private HybridDisk $disks,
-        private SubmissionAcceptanceService $acceptance,
+        private ReviewerDecisionService $decisions,
     ) {
     }
 
@@ -41,7 +39,7 @@ class ReviewController extends Controller
 
     public function show(Request $request, Submission $submission): View
     {
-        $this->assertAssigned($request, $submission);
+        $this->decisions->assertAssigned($request->user(), $submission);
 
         $submission->load([
             'journal',
@@ -69,7 +67,7 @@ class ReviewController extends Controller
 
     public function download(Request $request, Submission $submission): StreamedResponse
     {
-        $this->assertAssigned($request, $submission);
+        $this->decisions->assertAssigned($request->user(), $submission);
         abort_unless($submission->document_path, 404);
 
         return $this->disks->download(
@@ -82,7 +80,7 @@ class ReviewController extends Controller
 
     public function downloadRevision(Request $request, Submission $submission, SubmissionRevision $revision): StreamedResponse
     {
-        $this->assertAssigned($request, $submission);
+        $this->decisions->assertAssigned($request->user(), $submission);
         abort_unless((string) $revision->submission_id === (string) $submission->id, 404);
         abort_unless($revision->document_path, 404);
 
@@ -96,83 +94,16 @@ class ReviewController extends Controller
 
     public function decide(Request $request, Submission $submission): RedirectResponse
     {
-        $this->assertAssigned($request, $submission);
-
-        $active = ReviewerAssignment::query()
-            ->where('submission_id', $submission->id)
-            ->where('reviewer_id', $request->user()->id)
-            ->whereIn('status', ['assigned', 'in_progress'])
-            ->exists();
-
-        abort_unless($active, 422, 'This assignment is not awaiting a decision.');
-
         $data = $request->validate([
             'decision' => ['required', 'in:accept,reject,revision_requested'],
             'comment' => ['nullable', 'string'],
             'rejection_reason' => ['nullable', 'required_if:decision,reject', 'string'],
         ]);
 
-        DB::transaction(function () use ($request, $submission, $data) {
-            $updates = [
-                'reviewed_at' => now(),
-                'review_comment' => $data['comment'] ?? null,
-            ];
-
-            if ($data['decision'] === 'accept') {
-                $updates['rejection_reason'] = null;
-            } elseif ($data['decision'] === 'reject') {
-                $updates['status'] = 'rejected';
-                $updates['rejection_reason'] = $data['rejection_reason'] ?? $data['comment'] ?? null;
-            } else {
-                $updates['status'] = 'revision_requested';
-                $updates['review_comment'] = $data['comment'] ?? null;
-            }
-
-            $submission->update($updates);
-
-            if ($data['decision'] === 'accept') {
-                $this->acceptance->recordAcceptance($submission, $request->user()->id);
-            }
-
-            ReviewerAssignment::query()
-                ->where('submission_id', $submission->id)
-                ->where('reviewer_id', $request->user()->id)
-                ->whereIn('status', ['assigned', 'in_progress'])
-                ->update(['status' => 'completed']);
-
-            SubmissionTimeline::query()->create([
-                'submission_id' => $submission->id,
-                'user_id' => $request->user()->id,
-                'event' => 'review_decision',
-                'metadata' => [
-                    'decision' => $data['decision'],
-                    'comment' => $data['comment'] ?? null,
-                    'rejection_reason' => $updates['rejection_reason'] ?? null,
-                ],
-            ]);
-        });
+        $this->decisions->decide($request->user(), $submission, $data);
 
         return redirect()
             ->route('reviewer.reviews.index')
             ->with('status', 'Review decision recorded.');
-    }
-
-    private function assertAssigned(Request $request, Submission $submission): void
-    {
-        abort_if(
-            $submission->blocksEditorialProgress(),
-            422,
-            'This submission is awaiting payment and is not available for review yet.'
-        );
-
-        $assigned = ReviewerAssignment::query()
-            ->where('submission_id', $submission->id)
-            ->where('reviewer_id', $request->user()->id)
-            ->exists();
-
-        abort_unless(
-            $assigned || (int) $submission->reviewer_id === (int) $request->user()->id,
-            403
-        );
     }
 }

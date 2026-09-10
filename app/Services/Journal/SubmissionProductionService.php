@@ -160,7 +160,7 @@ class SubmissionProductionService
 
         $this->notifyEditorsProductionComplete($submission);
 
-        return $submission->fresh(['currentProductionFile', 'journal', 'author']);
+        return $submission->fresh(['productionFiles.uploader', 'journal', 'author']);
     }
 
     public function assertCanWorkOn(Submission $submission, User $actor): void
