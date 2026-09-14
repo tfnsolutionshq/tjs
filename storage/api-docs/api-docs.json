@@ -693,7 +693,14 @@
                         "description": "Article detail"
                     },
                     "404": {
-                        "description": "Not found or closed"
+                        "description": "Not found or closed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2152,9 +2159,9 @@
                         "example": "Journal not found."
                     },
                     "data": {
-                        "type": "object",
-                        "example": null,
-                        "nullable": true
+                        "type": "array",
+                        "items": {},
+                        "example": []
                     }
                 },
                 "type": "object"

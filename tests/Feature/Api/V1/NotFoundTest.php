@@ -30,7 +30,7 @@ class NotFoundTest extends TestCase
             ->assertHeader('Content-Type', 'application/json')
             ->assertJson([
                 'message' => 'Journal not found.',
-                'data' => null,
+                'data' => [],
             ]);
     }
 
@@ -50,7 +50,7 @@ class NotFoundTest extends TestCase
             ->assertHeader('Content-Type', 'application/json')
             ->assertJson([
                 'message' => 'The requested endpoint was not found.',
-                'data' => null,
+                'data' => [],
             ]);
     }
 
@@ -73,7 +73,7 @@ class NotFoundTest extends TestCase
             ->assertHeader('Content-Type', 'application/json')
             ->assertJson([
                 'message' => 'Journal not found.',
-                'data' => null,
+                'data' => [],
             ]);
     }
 
@@ -103,7 +103,7 @@ class NotFoundTest extends TestCase
             ->assertHeader('Content-Type', 'application/json')
             ->assertJson([
                 'message' => 'Submission not found.',
-                'data' => null,
+                'data' => [],
             ]);
     }
 
@@ -127,7 +127,7 @@ class NotFoundTest extends TestCase
             ->assertNotFound()
             ->assertJson([
                 'message' => 'Article not found.',
-                'data' => null,
+                'data' => [],
             ]);
     }
 }

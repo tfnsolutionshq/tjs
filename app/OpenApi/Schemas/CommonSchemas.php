@@ -14,7 +14,7 @@ use OpenApi\Attributes as OA;
     schema: 'NotFoundError',
     properties: [
         new OA\Property(property: 'message', type: 'string', example: 'Journal not found.'),
-        new OA\Property(property: 'data', type: 'object', nullable: true, example: null),
+        new OA\Property(property: 'data', type: 'array', items: new OA\Items(), example: []),
     ]
 )]
 #[OA\Schema(

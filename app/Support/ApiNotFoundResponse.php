@@ -10,7 +10,7 @@ class ApiNotFoundResponse
     {
         return response()->json([
             'message' => $message,
-            'data' => null,
+            'data' => [],
         ], 404);
     }
 }

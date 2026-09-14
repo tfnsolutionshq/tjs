@@ -465,6 +465,10 @@ paths:
           description: 'Article detail'
         404:
           description: 'Not found or closed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
   '/me/journals/{journal}/manage/dashboard':
     get:
       tags:
@@ -1436,9 +1440,9 @@ components:
           type: string
           example: 'Journal not found.'
         data:
-          type: object
-          example: null
-          nullable: true
+          type: array
+          items: []
+          example: []
       type: object
     ValidationError:
       properties:
