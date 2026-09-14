@@ -11,6 +11,12 @@ use OpenApi\Attributes as OA;
     ]
 )]
 #[OA\Schema(
+    schema: 'NotFoundError',
+    properties: [
+        new OA\Property(property: 'message', type: 'string', example: 'Journal not found.'),
+    ]
+)]
+#[OA\Schema(
     schema: 'ValidationError',
     properties: [
         new OA\Property(property: 'message', type: 'string', example: 'The given data was invalid.'),
