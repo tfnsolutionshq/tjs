@@ -72,7 +72,7 @@ class PaymentPaths
         ],
         responses: [
             new OA\Response(response: 200, description: 'PDF file', content: new OA\MediaType(mediaType: 'application/pdf')),
-            new OA\Response(response: 404, description: 'Receipt not available'),
+            new OA\Response(response: 404, description: 'Receipt not available', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
         ]
     )]
     public function paymentsReceipt(): void

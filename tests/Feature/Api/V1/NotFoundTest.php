@@ -28,7 +28,10 @@ class NotFoundTest extends TestCase
         $response
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
-            ->assertJsonPath('message', 'Journal not found.');
+            ->assertJson([
+                'message' => 'Journal not found.',
+                'data' => null,
+            ]);
     }
 
     public function test_unknown_api_route_returns_json_404_without_accept_header(): void
@@ -45,7 +48,10 @@ class NotFoundTest extends TestCase
         $response
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
-            ->assertJsonPath('message', 'The requested endpoint was not found.');
+            ->assertJson([
+                'message' => 'The requested endpoint was not found.',
+                'data' => null,
+            ]);
     }
 
     public function test_missing_journal_slug_in_manage_route_returns_json_404(): void
@@ -65,7 +71,10 @@ class NotFoundTest extends TestCase
         $response
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
-            ->assertJsonPath('message', 'Journal not found.');
+            ->assertJson([
+                'message' => 'Journal not found.',
+                'data' => null,
+            ]);
     }
 
     public function test_abort_404_message_is_returned_as_json(): void
@@ -92,6 +101,33 @@ class NotFoundTest extends TestCase
         $response
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
-            ->assertJsonPath('message', 'Submission not found.');
+            ->assertJson([
+                'message' => 'Submission not found.',
+                'data' => null,
+            ]);
+    }
+
+    public function test_closed_article_not_found_includes_empty_data(): void
+    {
+        $journal = Journal::query()->create([
+            'slug' => 'demo-journal',
+            'title' => 'Demo Journal',
+            'is_active' => true,
+            'activation_status' => JournalActivation::STATUS_ACTIVE,
+        ]);
+
+        $this->call(
+            'GET',
+            '/api/v1/journals/'.$journal->slug.'/articles/closed-article',
+            [],
+            [],
+            [],
+            ['HTTP_ACCEPT' => '*/*']
+        )
+            ->assertNotFound()
+            ->assertJson([
+                'message' => 'Article not found.',
+                'data' => null,
+            ]);
     }
 }

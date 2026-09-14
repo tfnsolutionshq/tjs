@@ -384,6 +384,10 @@ paths:
           description: 'Journal detail'
         404:
           description: 'Not found'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
   '/journals/{journal}/browse':
     get:
       tags:
@@ -1002,6 +1006,10 @@ paths:
             application/pdf: []
         404:
           description: 'Receipt not available'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
       security:
         -
           sanctum: []
@@ -1381,6 +1389,10 @@ paths:
           description: 'Document file stream'
         404:
           description: 'Not found'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
       security:
         -
           sanctum: []
@@ -1417,6 +1429,16 @@ components:
         message:
           type: string
           example: OK
+      type: object
+    NotFoundError:
+      properties:
+        message:
+          type: string
+          example: 'Journal not found.'
+        data:
+          type: object
+          example: null
+          nullable: true
       type: object
     ValidationError:
       properties:

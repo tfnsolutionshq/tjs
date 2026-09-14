@@ -81,7 +81,7 @@ class ReviewerPaths
         ],
         responses: [
             new OA\Response(response: 200, description: 'Document file stream'),
-            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 404, description: 'Not found', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
         ]
     )]
     public function downloadDocument(): void

@@ -52,7 +52,7 @@ class CatalogPaths
         ],
         responses: [
             new OA\Response(response: 200, description: 'Journal detail'),
-            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 404, description: 'Not found', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
         ]
     )]
     public function journalShow(): void
@@ -107,7 +107,7 @@ class CatalogPaths
         ],
         responses: [
             new OA\Response(response: 200, description: 'Article detail'),
-            new OA\Response(response: 404, description: 'Not found or closed'),
+            new OA\Response(response: 404, description: 'Not found or closed', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
         ]
     )]
     public function articleShow(): void

@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\ApiNotFoundMessage;
+use App\Support\ApiNotFoundResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -53,9 +54,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return response()->json([
-                'message' => ApiNotFoundMessage::forModel($exception->getModel()),
-            ], 404);
+            return ApiNotFoundResponse::make(
+                ApiNotFoundMessage::forModel($exception->getModel())
+            );
         });
 
         $exceptions->render(function (HttpExceptionInterface $exception, Request $request) {
@@ -63,8 +64,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return response()->json([
-                'message' => ApiNotFoundMessage::forHttpException($exception),
-            ], 404);
+            return ApiNotFoundResponse::make(
+                ApiNotFoundMessage::forHttpException($exception)
+            );
         });
     })->create();
