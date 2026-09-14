@@ -82,6 +82,63 @@ class JournalPickerService
     }
 
     /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, int|bool|null>}
+     */
+    public function searchForApi(?string $query, int $page, bool $featuredOnly = false, bool $nonFeaturedOnly = false): array
+    {
+        $builder = $this->baseQuery();
+
+        if ($featuredOnly) {
+            $builder->where('is_featured', true);
+        } elseif ($nonFeaturedOnly) {
+            $builder->where('is_featured', false);
+        }
+
+        $needle = trim($query ?? '');
+        if ($needle !== '') {
+            $builder->where(function (Builder $inner) use ($needle) {
+                $like = '%'.$needle.'%';
+                $inner->where('title', 'like', $like)
+                    ->orWhere('subtitle', 'like', $like)
+                    ->orWhere('slug', 'like', $like)
+                    ->orWhere('initials', 'like', $like);
+            });
+        }
+
+        /** @var LengthAwarePaginator<int, Journal> $paginator */
+        $paginator = $builder->paginate(self::PER_PAGE, ['*'], 'page', max(1, $page));
+
+        return [
+            'data' => $paginator->getCollection()
+                ->map(fn (Journal $journal) => $this->toApiPickerItem($journal))
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toApiPickerItem(Journal $journal): array
+    {
+        return [
+            'slug' => $journal->slug,
+            'title' => $journal->title,
+            'subtitle' => (string) ($journal->subtitle ?? ''),
+            'initials' => $journal->displayInitials(),
+            'is_featured' => (bool) $journal->is_featured,
+            'logo_url' => $journal->logoUrl(),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPickerItem(Journal $journal, string $action, ?string $redirect): array

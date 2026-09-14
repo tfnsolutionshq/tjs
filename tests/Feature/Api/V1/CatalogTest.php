@@ -17,6 +17,28 @@ class CatalogTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_journals_picker_searches_by_query(): void
+    {
+        Journal::query()->create([
+            'slug' => 'unizik-journal',
+            'title' => 'UNIZIK Journal of Science',
+            'is_active' => true,
+            'activation_status' => JournalActivation::STATUS_ACTIVE,
+        ]);
+        Journal::query()->create([
+            'slug' => 'other-journal',
+            'title' => 'Other Journal',
+            'is_active' => true,
+            'activation_status' => JournalActivation::STATUS_ACTIVE,
+        ]);
+
+        $this->getJson('/api/v1/journals/picker?q=unizik')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.slug', 'unizik-journal')
+            ->assertJsonMissing(['slug' => 'other-journal']);
+    }
+
     public function test_journals_index_lists_only_listed_journals(): void
     {
         Journal::query()->create([

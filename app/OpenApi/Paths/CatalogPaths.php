@@ -29,11 +29,13 @@ class CatalogPaths
         summary: 'Searchable journal picker',
         tags: ['Catalog'],
         parameters: [
-            new OA\Parameter(name: 'q', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['featured', 'all'])),
+            new OA\Parameter(name: 'q', in: 'query', description: 'Search by title, subtitle, slug, or initials', schema: new OA\Schema(type: 'string', example: 'unizik')),
+            new OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['featured', 'other', 'all'], default: 'all')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Journal picker results'),
+            new OA\Response(response: 422, description: 'Validation error', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
         ]
     )]
     public function journalsPicker(): void

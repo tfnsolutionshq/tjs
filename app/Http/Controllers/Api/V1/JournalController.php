@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Auth\JournalPickerController;
+use App\Services\Journal\JournalPickerService;
 use App\Http\Resources\Api\V1\ArticleSummaryResource;
 use App\Http\Resources\Api\V1\JournalDetailResource;
 use App\Http\Resources\Api\V1\JournalResource;
@@ -99,8 +99,23 @@ class JournalController extends Controller
             ->response();
     }
 
-    public function picker(Request $request, JournalPickerController $picker): JsonResponse
+    public function picker(Request $request, JournalPickerService $picker): JsonResponse
     {
-        return $picker($request);
+        $data = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'mode' => ['nullable', 'in:featured,other,all'],
+        ]);
+
+        $mode = $data['mode'] ?? 'all';
+
+        return response()->json(
+            $picker->searchForApi(
+                $data['q'] ?? null,
+                (int) ($data['page'] ?? 1),
+                $mode === 'featured',
+                $mode === 'other',
+            )
+        );
     }
 }

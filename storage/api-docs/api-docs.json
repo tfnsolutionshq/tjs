@@ -506,8 +506,10 @@
                     {
                         "name": "q",
                         "in": "query",
+                        "description": "Search by title, subtitle, slug, or initials",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "unizik"
                         }
                     },
                     {
@@ -515,16 +517,36 @@
                         "in": "query",
                         "schema": {
                             "type": "string",
+                            "default": "all",
                             "enum": [
                                 "featured",
+                                "other",
                                 "all"
                             ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
                         }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Journal picker results"
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
                     }
                 }
             }
