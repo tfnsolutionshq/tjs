@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'review.queue' => \App\Http\Middleware\EnsureCanAccessReviewQueue::class,
             'production.queue' => \App\Http\Middleware\EnsureCanAccessProductionQueue::class,
             'api.enabled' => \App\Http\Middleware\EnsureApiEnabled::class,
+            'api.docs' => \App\Http\Middleware\EnsureApiDocsEnabled::class,
             'optional.sanctum' => \App\Http\Middleware\OptionalSanctumAuth::class,
         ]);
         $middleware->validateCsrfTokens(except: [

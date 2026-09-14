@@ -1,0 +1,2224 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "TJS Mobile API",
+        "description": "REST API for the TFN Journal System (TJS) mobile and external clients. Authenticated routes use Laravel Sanctum bearer tokens obtained from `POST /auth/login`. Most write endpoints require a verified email address.",
+        "contact": {
+            "name": "TFN Solutions",
+            "url": "https://tjs.tfnsolutions.us"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api/v1",
+            "description": "API v1 base path"
+        }
+    ],
+    "paths": {
+        "/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login and obtain bearer token",
+                "operationId": "authLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password"
+                                    },
+                                    "device_name": {
+                                        "type": "string",
+                                        "example": "mobile"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Token issued"
+                    },
+                    "422": {
+                        "description": "Invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts"
+                    },
+                    "503": {
+                        "description": "API disabled"
+                    }
+                }
+            }
+        },
+        "/auth/user": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Current user profile and capabilities",
+                "operationId": "authUser",
+                "responses": {
+                    "200": {
+                        "description": "Profile"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Revoke current token",
+                "operationId": "authLogout",
+                "responses": {
+                    "200": {
+                        "description": "Logged out"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/auth/verify-email": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Verify email with OTP code",
+                "operationId": "authVerifyEmail",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "code"
+                                ],
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "example": "123456",
+                                        "maxLength": 6,
+                                        "minLength": 6
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Verified"
+                    },
+                    "422": {
+                        "description": "Invalid code"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/auth/resend-verification": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Resend email verification OTP",
+                "operationId": "authResendVerification",
+                "responses": {
+                    "200": {
+                        "description": "Code sent"
+                    },
+                    "429": {
+                        "description": "Cooldown active"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions/create-options": {
+            "get": {
+                "tags": [
+                    "Author"
+                ],
+                "summary": "Open calls and categories for new submission",
+                "operationId": "authorSubmissionCreateOptions",
+                "responses": {
+                    "200": {
+                        "description": "Create options"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "403": {
+                        "description": "Email not verified"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions": {
+            "get": {
+                "tags": [
+                    "Author"
+                ],
+                "summary": "List own submissions",
+                "operationId": "authorSubmissionsIndex",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 12
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated submissions with stats"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Author"
+                ],
+                "summary": "Create submission",
+                "description": "Multipart upload. Required file field: `document` (DOC/DOCX, max 51200 KB).",
+                "operationId": "authorSubmissionsStore",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "announcement_id",
+                                    "title",
+                                    "document"
+                                ],
+                                "properties": {
+                                    "announcement_id": {
+                                        "type": "integer"
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "abstract": {
+                                        "type": "string"
+                                    },
+                                    "category": {
+                                        "type": "string"
+                                    },
+                                    "keywords": {
+                                        "type": "string"
+                                    },
+                                    "document": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Submission created"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions/{submission}": {
+            "get": {
+                "tags": [
+                    "Author"
+                ],
+                "summary": "Submission detail",
+                "operationId": "authorSubmissionsShow",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Submission detail"
+                    },
+                    "403": {
+                        "description": "Not your submission"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions/{submission}/resubmit": {
+            "post": {
+                "tags": [
+                    "Author"
+                ],
+                "summary": "Upload revision",
+                "operationId": "authorSubmissionsResubmit",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "document"
+                                ],
+                                "properties": {
+                                    "document": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Revision uploaded"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions/{submission}/pay-submission-fee": {
+            "post": {
+                "tags": [
+                    "Author",
+                    "Payments"
+                ],
+                "summary": "Initialize Paystack checkout for submission fee",
+                "operationId": "authorPaySubmissionFee",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paystack initialize payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaystackInitialize"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/submissions/{submission}/pay-publication-fee": {
+            "post": {
+                "tags": [
+                    "Author",
+                    "Payments"
+                ],
+                "summary": "Initialize Paystack checkout for publication fee (APC)",
+                "operationId": "authorPayPublicationFee",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paystack initialize payload"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/journals": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List public journals",
+                "operationId": "listJournals",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 12
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated journal list"
+                    }
+                }
+            }
+        },
+        "/journals/picker": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Searchable journal picker",
+                "operationId": "journalsPicker",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "featured",
+                                "all"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Journal picker results"
+                    }
+                }
+            }
+        },
+        "/journals/{journal}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Journal detail",
+                "operationId": "showJournal",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "description": "Journal slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Journal detail"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                }
+            }
+        },
+        "/journals/{journal}/browse": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Browse articles in a journal",
+                "operationId": "browseJournal",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated articles"
+                    }
+                }
+            }
+        },
+        "/articles": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Platform-wide public article catalog",
+                "operationId": "listArticles",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 12
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated articles"
+                    }
+                }
+            }
+        },
+        "/journals/{journal}/articles/{article}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Article detail with access hints",
+                "description": "Optional Bearer token improves access resolution for members-only or purchased content.",
+                "operationId": "showArticle",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "article",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Article detail"
+                    },
+                    "404": {
+                        "description": "Not found or closed"
+                    }
+                }
+            }
+        },
+        "/me/journals/{journal}/manage/dashboard": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Journal manage dashboard",
+                "operationId": "journalManageDashboard",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "description": "Journal slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stats and recent activity"
+                    },
+                    "403": {
+                        "description": "Not a manager or activation locked"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Journal submissions inbox",
+                "operationId": "journalManageSubmissionsIndex",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated submissions with stats"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions/form-options": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Reviewer and issue pickers",
+                "operationId": "journalManageSubmissionsFormOptions",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Form options"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions/{submission}": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Editor submission detail",
+                "operationId": "journalManageSubmissionsShow",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Submission detail with author visible"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions/{submission}/assign-reviewer": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Assign reviewer",
+                "operationId": "journalManageAssignReviewer",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reviewer_id"
+                                ],
+                                "properties": {
+                                    "reviewer_id": {
+                                        "type": "integer"
+                                    },
+                                    "priority": {
+                                        "type": "integer",
+                                        "maximum": 5,
+                                        "minimum": 1
+                                    },
+                                    "due_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reviewer assigned"
+                    },
+                    "422": {
+                        "description": "Fee pending or validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions/{submission}/review-type": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Update review type",
+                "operationId": "journalManageUpdateReviewType",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "review_type"
+                                ],
+                                "properties": {
+                                    "review_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "closed",
+                                            "open"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Review type updated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/submissions/{submission}/publish": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Publish submission to issue",
+                "description": "Requires production complete (`ready_to_publish`) and a production document on file.",
+                "operationId": "journalManagePublish",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "issue_id"
+                                ],
+                                "properties": {
+                                    "issue_id": {
+                                        "type": "integer"
+                                    },
+                                    "slug": {
+                                        "type": "string"
+                                    },
+                                    "doi": {
+                                        "type": "string"
+                                    },
+                                    "license": {
+                                        "type": "string"
+                                    },
+                                    "page_range": {
+                                        "type": "string"
+                                    },
+                                    "visibility": {
+                                        "type": "string",
+                                        "enum": [
+                                            "open",
+                                            "members_only",
+                                            "paid",
+                                            "closed"
+                                        ]
+                                    },
+                                    "author_name": {
+                                        "type": "string"
+                                    },
+                                    "authors_text": {
+                                        "description": "One author per line: Name|email|affiliation|orcid",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Published article created"
+                    },
+                    "422": {
+                        "description": "Not ready to publish"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/reviewer-requests": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Pending reviewer applications",
+                "operationId": "journalManageReviewerRequests",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pending and recent requests"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/reviewer-requests/{reviewerRequest}/approve": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Approve reviewer application",
+                "operationId": "journalManageApproveReviewerRequest",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "reviewerRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "admin_note": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Approved"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/reviewer-requests/{reviewerRequest}/reject": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Reject reviewer application",
+                "operationId": "journalManageRejectReviewerRequest",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "reviewerRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "admin_note": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Rejected"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/announcements": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "List announcements and calls",
+                "operationId": "journalManageAnnouncementsIndex",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated announcements"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Create announcement or call for submissions",
+                "operationId": "journalManageAnnouncementsStore",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "example": "call_for_submissions"
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "summary": {
+                                        "type": "string"
+                                    },
+                                    "body": {
+                                        "type": "string"
+                                    },
+                                    "is_published": {
+                                        "type": "boolean"
+                                    },
+                                    "issue_id": {
+                                        "description": "Required for calls",
+                                        "type": "integer"
+                                    },
+                                    "opens_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "closes_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/announcements/{announcement}/close": {
+            "post": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Close call for submissions",
+                "operationId": "journalManageAnnouncementsClose",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "announcement",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Call closed"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/journals/{journal}/manage/volumes": {
+            "get": {
+                "tags": [
+                    "Journal Manage"
+                ],
+                "summary": "Volumes and issues tree",
+                "operationId": "journalManageVolumes",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Volumes with nested issues"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/memberships": {
+            "get": {
+                "tags": [
+                    "Memberships"
+                ],
+                "summary": "Active memberships and available plans",
+                "operationId": "membershipsIndex",
+                "parameters": [
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "featured",
+                            "enum": [
+                                "featured",
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Membership catalog"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments": {
+            "get": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Payment transaction history",
+                "operationId": "paymentsIndex",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated transactions"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/{paymentTransaction}": {
+            "get": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Payment transaction detail",
+                "operationId": "paymentsShow",
+                "parameters": [
+                    {
+                        "name": "paymentTransaction",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Transaction detail"
+                    },
+                    "403": {
+                        "description": "Not your transaction"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/{paymentTransaction}/receipt": {
+            "get": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Download PDF receipt",
+                "operationId": "paymentsReceipt",
+                "parameters": [
+                    {
+                        "name": "paymentTransaction",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PDF file",
+                        "content": {
+                            "application/pdf": {}
+                        }
+                    },
+                    "404": {
+                        "description": "Receipt not available"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/verify": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Confirm payment after Paystack checkout",
+                "description": "Call after the user completes Paystack checkout to grant entitlements (purchase, membership, fees).",
+                "operationId": "paymentsVerify",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reference"
+                                ],
+                                "properties": {
+                                    "reference": {
+                                        "type": "string",
+                                        "example": "TJS_abc123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment confirmed"
+                    },
+                    "422": {
+                        "description": "Verification failed"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/articles/{journal}/{article}/purchase": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Initialize Paystack checkout for paid article",
+                "operationId": "purchaseArticle",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "article",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paystack initialize payload"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/memberships/{plan}/purchase": {
+            "post": {
+                "tags": [
+                    "Payments",
+                    "Memberships"
+                ],
+                "summary": "Initialize Paystack checkout for membership plan",
+                "operationId": "purchaseMembership",
+                "parameters": [
+                    {
+                        "name": "plan",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paystack initialize payload"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/payments/journals/{journal}/activate": {
+            "post": {
+                "tags": [
+                    "Payments",
+                    "Journal Manage"
+                ],
+                "summary": "Initialize Paystack checkout for journal activation",
+                "operationId": "activateJournal",
+                "parameters": [
+                    {
+                        "name": "journal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paystack initialize payload"
+                    },
+                    "403": {
+                        "description": "Not a journal manager"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue": {
+            "get": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Production queue",
+                "operationId": "productionQueueIndex",
+                "parameters": [
+                    {
+                        "name": "filter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "awaiting",
+                            "enum": [
+                                "awaiting",
+                                "in_production",
+                                "ready",
+                                "completed"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "journal_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Queue list with stats"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}": {
+            "get": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Production detail with checklist schema",
+                "operationId": "productionQueueShow",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Production detail"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}/start": {
+            "post": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Start production",
+                "operationId": "productionStart",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Production started"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}/upload": {
+            "post": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Upload production document",
+                "operationId": "productionUpload",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "production_document"
+                                ],
+                                "properties": {
+                                    "production_document": {
+                                        "description": "DOC, DOCX, or PDF (max 51200 KB)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Document uploaded"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}/complete": {
+            "post": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Mark production complete",
+                "operationId": "productionComplete",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "checklist": {
+                                        "description": "Production checklist booleans (see checklist_schema in detail response)",
+                                        "type": "object",
+                                        "example": {
+                                            "formatting_applied": true,
+                                            "branding_applied": true
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Production complete"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}/source-document": {
+            "get": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Download author manuscript",
+                "operationId": "productionDownloadSource",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Source document stream"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/production/queue/{submission}/production-document": {
+            "get": {
+                "tags": [
+                    "Production"
+                ],
+                "summary": "Download current production file",
+                "operationId": "productionDownloadProduction",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Production document stream"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/reviews": {
+            "get": {
+                "tags": [
+                    "Reviewer"
+                ],
+                "summary": "Active reviewer assignments",
+                "operationId": "reviewsIndex",
+                "parameters": [
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 12
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assignment list with stats"
+                    },
+                    "403": {
+                        "description": "No review queue access"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/reviews/{submission}": {
+            "get": {
+                "tags": [
+                    "Reviewer"
+                ],
+                "summary": "Review assignment detail",
+                "operationId": "reviewsShow",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Review detail (author hidden on closed review)"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/reviews/{submission}/decide": {
+            "post": {
+                "tags": [
+                    "Reviewer"
+                ],
+                "summary": "Submit review decision",
+                "operationId": "reviewsDecide",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "decision"
+                                ],
+                                "properties": {
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "accept",
+                                            "reject",
+                                            "revision_requested"
+                                        ]
+                                    },
+                                    "comment": {
+                                        "type": "string"
+                                    },
+                                    "rejection_reason": {
+                                        "description": "Required when decision is reject",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Decision recorded"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/reviews/{submission}/document": {
+            "get": {
+                "tags": [
+                    "Reviewer"
+                ],
+                "summary": "Download current manuscript",
+                "operationId": "reviewsDownloadDocument",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Document file stream"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me/reviews/{submission}/revisions/{revision}/document": {
+            "get": {
+                "tags": [
+                    "Reviewer"
+                ],
+                "summary": "Download revision document",
+                "operationId": "reviewsDownloadRevision",
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "revision",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Revision file stream"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "MessageResponse": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "OK"
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "The given data was invalid."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "PaystackInitialize": {
+                "properties": {
+                    "reference": {
+                        "type": "string",
+                        "example": "TJS_abc123"
+                    },
+                    "authorization_url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "access_code": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "example": 5000
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "NGN"
+                    },
+                    "gateway_mode": {
+                        "type": "string",
+                        "enum": [
+                            "personal",
+                            "split",
+                            "platform"
+                        ]
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "example": "article_purchase"
+                    },
+                    "transaction_id": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "JournalSummary": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "is_featured": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "sanctum": {
+                "type": "http",
+                "description": "Sanctum personal access token from `POST /auth/login`. Format: `Bearer {token}`",
+                "bearerFormat": "Sanctum",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Login, profile, email verification"
+        },
+        {
+            "name": "Catalog",
+            "description": "Public journals and articles"
+        },
+        {
+            "name": "Author",
+            "description": "Author submissions and fees"
+        },
+        {
+            "name": "Payments",
+            "description": "Paystack checkout initialization and receipts"
+        },
+        {
+            "name": "Memberships",
+            "description": "Membership plans"
+        },
+        {
+            "name": "Reviewer",
+            "description": "Reviewer assignment queue"
+        },
+        {
+            "name": "Production",
+            "description": "Production editor queue"
+        },
+        {
+            "name": "Journal Manage",
+            "description": "Journal editor/admin tools"
+        }
+    ]
+}
