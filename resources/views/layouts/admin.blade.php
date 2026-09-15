@@ -70,8 +70,7 @@
             text-decoration: none; color: #fff;
         }
         .admin-brand img {
-            height: 2.15rem; width: auto; border-radius: .45rem;
-            background: #fff; object-fit: contain; padding: 2px;
+            height: 2.15rem; width: auto; object-fit: contain;
         }
         .admin-brand__text {
             font-size: .95rem; font-weight: 800; letter-spacing: .04em;
@@ -557,7 +556,7 @@
         <aside class="admin-sidebar" :class="{ 'is-open': sidebarOpen }">
             <a href="{{ route('admin.dashboard') }}" class="admin-brand" @click="sidebarOpen = false">
                 <x-platform-logo variant="dark" type="icon" class="h-9 w-auto object-contain" />
-                <span class="admin-brand__text">{{ config('tjs.name') }} <span>ADMIN</span></span>
+                <span class="admin-brand__text">ADMIN</span>
             </a>
 
             <nav class="admin-nav" aria-label="Admin">

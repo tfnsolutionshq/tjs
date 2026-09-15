@@ -78,8 +78,7 @@
             text-decoration: none; color: #fff;
         }
         .admin-brand img {
-            height: 2.15rem; width: auto; border-radius: .45rem;
-            background: #fff; object-fit: contain; padding: 2px;
+            height: 2.15rem; width: auto; object-fit: contain;
         }
         .admin-brand__text {
             font-size: .95rem; font-weight: 800; letter-spacing: .04em;
