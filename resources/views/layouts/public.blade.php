@@ -285,7 +285,7 @@
                 <a href="{{ route('home') }}" class="inline-flex">
                     <x-platform-logo variant="dark" class="h-10 w-auto object-contain" />
                 </a>
-                <p class="mt-3 text-sm leading-relaxed">{{ config('tjs.full_name') }} by {{ config('tjs.organization') }}.</p>
+                <p class="mt-3 text-sm leading-relaxed">{{ config('tjs.pitch') }}</p>
             </div>
             <div class="text-sm space-y-2">
                 <p class="text-white font-semibold">Explore</p>
@@ -295,7 +295,7 @@
             </div>
             <div class="text-sm space-y-2">
                 <p class="text-white font-semibold">Publishing</p>
-                <p>Peer review, themed journal sites, DOI-ready metadata, and controlled full-text access.</p>
+                <p>{{ config('tjs.landing_footer_publishing') }}</p>
             </div>
         </div>
         <div class="border-t border-white/10">

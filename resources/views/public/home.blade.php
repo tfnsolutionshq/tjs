@@ -32,10 +32,10 @@
                 {{ config('tjs.full_name') }}
             </p>
             <h1 class="tjs-reveal tjs-serif mt-3 text-[2.15rem] font-bold leading-[1.15] text-[#1c2430] sm:text-5xl" style="--reveal-delay:40ms">
-                A modern publishing solution for anyone who publishes.
+                {{ config('tjs.landing_headline') }}
             </h1>
             <p class="tjs-reveal mt-5 max-w-xl text-base leading-relaxed sm:text-lg" style="color:var(--muted);--reveal-delay:120ms">
-                {{ config('tjs.pitch') ?: ('TJS gives '.config('tjs.organization').' multi-journal websites, peer review, APA citations, and access-controlled full text — with branding themes for every journal.') }}
+                {{ config('tjs.pitch') }}
             </p>
             <div class="tjs-reveal mt-8 flex flex-wrap gap-3" style="--reveal-delay:200ms">
                 <a href="{{ route('journals.index') }}" class="btn btn-blue">Browse journals</a>
@@ -54,7 +54,7 @@
     <div class="container-x py-14 lg:py-16">
         <div class="tjs-reveal mx-auto max-w-3xl">
             <p class="text-xs font-bold uppercase tracking-[0.18em]" style="color:var(--blue)">About TJS</p>
-            <h2 class="tjs-serif mt-2 text-3xl font-bold text-slate-900">Built to simplify, professionalize, and scale publishing</h2>
+            <h2 class="tjs-serif mt-2 text-3xl font-bold text-slate-900">{{ config('tjs.landing_about_heading') }}</h2>
             <div class="mt-5 space-y-4 text-base leading-relaxed" style="color:var(--muted)">
                 @foreach(preg_split("/\n\s*\n/", trim((string) config('tjs.description'))) as $para)
                     @if(filled($para))

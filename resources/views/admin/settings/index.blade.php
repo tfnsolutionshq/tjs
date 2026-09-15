@@ -262,6 +262,41 @@
 
         <div class="as-card" style="margin-top:1rem">
             <div class="as-card__head">
+                <h2 class="as-card__title">Landing page</h2>
+                <p class="as-card__desc">Homepage hero, about section, and footer copy shown on the public site.</p>
+            </div>
+            <div class="as-card__body">
+                <div class="as-grid">
+                    <div class="as-field">
+                        <label for="landing_headline">Hero headline</label>
+                        <input id="landing_headline" name="landing_headline" type="text" required class="as-input" maxlength="240" value="{{ old('landing_headline', $settings['landing_headline']) }}">
+                        <p class="as-hint">Large title under the product name on the homepage.</p>
+                    </div>
+                    <div class="as-field">
+                        <label for="pitch">Hero pitch <span class="as-req">*</span></label>
+                        <textarea id="pitch" name="pitch" required class="as-input" rows="3" maxlength="500">{{ old('pitch', $settings['pitch']) }}</textarea>
+                        <p class="as-hint">Shown under the hero headline and under the logo in the site footer.</p>
+                    </div>
+                    <div class="as-field">
+                        <label for="landing_about_heading">About section heading</label>
+                        <input id="landing_about_heading" name="landing_about_heading" type="text" required class="as-input" maxlength="240" value="{{ old('landing_about_heading', $settings['landing_about_heading']) }}">
+                    </div>
+                    <div class="as-field">
+                        <label for="description">About section body</label>
+                        <textarea id="description" name="description" required class="as-input" rows="8" maxlength="5000">{{ old('description', $settings['description']) }}</textarea>
+                        <p class="as-hint">Separate paragraphs with a blank line.</p>
+                    </div>
+                    <div class="as-field">
+                        <label for="landing_footer_publishing">Footer “Publishing” blurb</label>
+                        <textarea id="landing_footer_publishing" name="landing_footer_publishing" required class="as-input" rows="2" maxlength="500">{{ old('landing_footer_publishing', $settings['landing_footer_publishing']) }}</textarea>
+                        <p class="as-hint">Short text in the footer’s Publishing column.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="as-card" style="margin-top:1rem">
+            <div class="as-card__head">
                 <h2 class="as-card__title">Payments</h2>
                 <p class="as-card__desc">Turn platform-charged products on or off, and set their price and duration.</p>
             </div>

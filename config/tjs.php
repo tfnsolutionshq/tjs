@@ -29,6 +29,9 @@ return [
     */
     'tagline' => 'TurboFlux Journal System (TJS): a modern publishing solution for anyone who publishes—built to simplify, professionalize, and scale the entire article publishing process.',
     'pitch' => 'TurboFlux Journal System (TJS): a modern publishing solution for anyone who publishes—built to simplify, professionalize, and scale the entire article publishing process.',
+    'landing_headline' => 'A modern publishing solution for anyone who publishes.',
+    'landing_about_heading' => 'Built to simplify, professionalize, and scale publishing',
+    'landing_footer_publishing' => 'Peer review, themed journal sites, DOI-ready metadata, and controlled full-text access.',
     'description' => 'TurboFlux Journal System (TJS) is a modern, all-in-one publishing platform designed for individual researchers, scholars, academics, authors, research groups, universities, academic departments, professional associations, learned societies, publishers, institutions, corporations, government agencies, NGOs, and other organisations that publish scholarly, scientific, technical, professional, or general-interest articles.
 
 TJS streamlines the entire journal publishing lifecycle in one powerful platform—from article submission and editorial management to peer review, citation formatting, publication, DOI deposition, access-controlled full text, and long-term journal management. It supports multiple journals from a single platform, with customizable branding themes.',

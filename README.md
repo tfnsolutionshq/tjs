@@ -98,7 +98,9 @@ php artisan test --filter=JournalAccessAndSeoTest
 
 ## Deploy
 
-See [deploy/DEPLOY.md](deploy/DEPLOY.md).
+See [docs/SYSTEM.md](docs/SYSTEM.md) for roles, permissions, and workflow documentation.
+
+See [deploy/DEPLOY.md](deploy/DEPLOY.md) for deployment.
 
 Demo / showcase: `tjs.tfnsolutions.us`  
 Live publishing (planned): `tjsjournals.org` with article files on S3
